@@ -1,0 +1,49 @@
+{
+  "name": "@autoecon/openclaw-wallet",
+  "version": "0.1.0-beta.1",
+  "description": "Economic autonomy for your agent — no keys required",
+  "main": "src/index.js",
+  "bin": {
+    "autoecon": "./bin/autoecon.js"
+  },
+  "scripts": {
+    "test": "node --test test/**/*.test.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ermirbeqiraj/openclaw-wallet.git"
+  },
+  "keywords": [
+    "autoecon",
+    "openclaw",
+    "wallet",
+    "mcp",
+    "crypto",
+    "defi",
+    "agent"
+  ],
+  "author": "ermirbeqiraj",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ermirbeqiraj/openclaw-wallet/issues"
+  },
+  "homepage": "https://github.com/ermirbeqiraj/openclaw-wallet#readme",
+  "dependencies": {
+    "axios": "^1.13.5",
+    "dotenv": "^16.6.1"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-prettier": "^5.5.5",
+    "prettier": "^3.8.1"
+  },
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

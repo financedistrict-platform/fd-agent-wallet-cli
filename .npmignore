@@ -1,0 +1,33 @@
+# Development files
+.external/
+.todos/
+.env
+.env.*
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test files
+test/
+*.test.js
+*.spec.js
+
+# CI/CD
+.github/

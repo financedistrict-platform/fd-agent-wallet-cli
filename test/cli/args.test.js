@@ -1,38 +1,7 @@
 const assert = require('node:assert');
 const { describe, it } = require('node:test');
 
-// Extract parseArgs function for testing
-function parseArgs(argv) {
-  const args = {};
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-
-    if (arg.startsWith('--')) {
-      const key = arg.substring(2);
-      const value = argv[i + 1];
-
-      if (value === undefined || value.startsWith('--')) {
-        args[key] = true;
-      } else {
-        args[key] = parseValue(value);
-        i++;
-      }
-    }
-  }
-
-  return args;
-}
-
-function parseValue(value) {
-  if (value === 'true') return true;
-  if (value === 'false') return false;
-
-  const num = Number(value);
-  if (!isNaN(num) && value.trim() !== '') return num;
-
-  return value;
-}
+const { parseArgs, parseValue } = require('../../src/utils/args');
 
 describe('CLI Argument Parser', () => {
   describe('parseArgs', () => {
@@ -88,7 +57,6 @@ describe('CLI Argument Parser', () => {
 
     it('should parse number-like string with whitespace', () => {
       const args = parseArgs(['--value', ' 123 ']);
-      // trim() is called, so it becomes a number
       assert.strictEqual(args.value, 123);
     });
   });
@@ -113,10 +81,13 @@ describe('CLI Argument Parser', () => {
       assert.strictEqual(parseValue('0.001'), 0.001);
     });
 
-    it('should parse hex strings as numbers if valid', () => {
-      // JavaScript's Number() parses hex strings
-      assert.strictEqual(parseValue('0xABC'), 2748);
-      assert.strictEqual(parseValue('0x10'), 16);
+    it('should preserve hex strings as strings', () => {
+      assert.strictEqual(parseValue('0xABC'), '0xABC');
+      assert.strictEqual(parseValue('0x10'), '0x10');
+      assert.strictEqual(
+        parseValue('0x1234567890abcdef1234567890abcdef12345678'),
+        '0x1234567890abcdef1234567890abcdef12345678',
+      );
     });
 
     it('should return string for non-numeric text', () => {

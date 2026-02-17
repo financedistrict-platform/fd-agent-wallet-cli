@@ -8,6 +8,16 @@ class MCPAuthClient {
     if (!mcpServerUrl) throw new Error('mcpServerUrl is required');
     if (!redirectUri) throw new Error('redirectUri is required');
     if (!storePath) throw new Error('storePath is required');
+
+    const parsed = new URL(mcpServerUrl);
+    if (
+      parsed.protocol !== 'https:' &&
+      parsed.hostname !== 'localhost' &&
+      parsed.hostname !== '127.0.0.1'
+    ) {
+      throw new Error('mcpServerUrl must use HTTPS (HTTP is only allowed for localhost)');
+    }
+
     this.mcpServerUrl = mcpServerUrl.replace(/\/$/, '');
     this.redirectUri = redirectUri;
     this.storePath = storePath;
@@ -40,6 +50,9 @@ class MCPAuthClient {
     const { data: protectedResource } = await this.httpClient.get(protectedResourceUrl);
 
     this.oauthServerUrl = protectedResource.authorization_servers[0];
+    const oauthHost = new URL(this.oauthServerUrl).host;
+    // eslint-disable-next-line no-console
+    console.log(`OAuth server: ${oauthHost}`);
     const discoveryUrl = `${this.oauthServerUrl}/.well-known/oauth-authorization-server`;
     const { data: metadata } = await this.httpClient.get(discoveryUrl);
 
@@ -52,7 +65,7 @@ class MCPAuthClient {
         this.registrationEndpoint,
         {
           redirect_uris: [this.redirectUri],
-          client_name: 'AutoEcon Wallet Client',
+          client_name: 'FDX Wallet Client',
           token_endpoint_auth_method: 'none',
           grant_types: ['authorization_code', 'refresh_token'],
           response_types: ['code'],
@@ -84,8 +97,6 @@ class MCPAuthClient {
     const state = generateState();
     const codeChallenge = await generateCodeChallenge(verifier);
 
-    await this.#persistSession({ codeVerifier: verifier, state });
-
     const url = new URL(this.authorizationEndpoint);
     url.searchParams.set('response_type', 'code');
     url.searchParams.set('client_id', this.clientId);
@@ -105,15 +116,14 @@ class MCPAuthClient {
     };
   }
 
-  async exchangeCodeForToken({ code, state }) {
+  async exchangeCodeForToken({ code, state, codeVerifier }) {
     await this.initialize();
 
-    const session = await this.#getStoreProperty('session');
-    if (!session?.codeVerifier) {
-      throw new Error('No PKCE session found');
+    if (!codeVerifier) {
+      throw new Error('codeVerifier is required');
     }
-    if (session.state !== state) {
-      throw new Error('State mismatch');
+    if (!state) {
+      throw new Error('state is required');
     }
 
     const payload = new URLSearchParams({
@@ -121,7 +131,7 @@ class MCPAuthClient {
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
       code,
-      code_verifier: session.codeVerifier,
+      code_verifier: codeVerifier,
     });
 
     const { data } = await this.httpClient.post(this.tokenEndpoint, payload.toString(), {
@@ -129,7 +139,6 @@ class MCPAuthClient {
     });
 
     await this.#persistTokens(data);
-    await this.#clearSession();
     return data;
   }
 
@@ -168,12 +177,6 @@ class MCPAuthClient {
     return data.access_token;
   }
 
-  async #persistSession(session) {
-    const store = await this.#readStore();
-    store.session = { ...session, createdAt: new Date().toISOString() };
-    await writeStore(store, this.storePath);
-  }
-
   async #persistTokens(tokenResponse) {
     const store = await this.#readStore();
     const expiresInMs = (tokenResponse.expires_in || 0) * 1000;
@@ -196,12 +199,6 @@ class MCPAuthClient {
   async #getStoreProperty(property) {
     const store = await this.#readStore();
     return store[property];
-  }
-
-  async #clearSession() {
-    const store = await this.#readStore();
-    delete store.session;
-    await writeStore(store, this.storePath);
   }
 
   async #readStore() {

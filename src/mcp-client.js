@@ -1,6 +1,8 @@
 const axios = require('axios');
 
 class MCPClient {
+  #requestId = 0;
+
   constructor({ mcpServerUrl, authClient, httpClient }) {
     if (!mcpServerUrl) throw new Error('mcpServerUrl is required');
     if (!authClient) throw new Error('authClient is required');
@@ -10,14 +12,14 @@ class MCPClient {
     this.httpClient = httpClient || axios.create();
   }
 
-  async callTool(toolName, args) {
+  async callTool(toolName, args, retried = false) {
     if (!toolName) throw new Error('toolName is required');
 
     const arguments_ = args || {};
 
     const payload = {
       jsonrpc: '2.0',
-      id: 1,
+      id: ++this.#requestId,
       method: 'tools/call',
       params: {
         name: toolName,
@@ -75,10 +77,10 @@ class MCPClient {
 
       return { data: responseData };
     } catch (error) {
-      if (error.response?.status === 401) {
+      if (error.response?.status === 401 && !retried) {
         try {
           await this.authClient.refreshToken();
-          return this.callTool(toolName, arguments_);
+          return this.callTool(toolName, arguments_, true);
         } catch (refreshError) {
           return {
             error: {

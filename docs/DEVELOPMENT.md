@@ -1,24 +1,22 @@
-# AutoEcon + OpenClaw: Server Setup Guide
+# Development Guide
 
-Step-by-step instructions to install and test AutoEcon on an OpenClaw instance running on a remote server.
+Step-by-step instructions to set up FDX for local development on any machine.
 
 ---
 
 ## Prerequisites
 
-- Remote server with OpenClaw installed (`~/.openclaw/`)
-- Node.js >= 18 on the server
-- Git on the server
-- A browser accessible from the server (or SSH tunnel for the OAuth callback)
+- Node.js >= 18
+- Git
+- A browser for the OAuth consent flow
 
 ---
 
 ## 1. Clone the repo
 
 ```bash
-cd ~/gh
-git clone https://github.com/ermirbeqiraj/openclaw-wallet.git
-cd openclaw-wallet
+git clone https://github.com/1stdigital/fd-agent-wallet-cli.git
+cd fd-agent-wallet-cli
 ```
 
 ## 2. Install dependencies and link the CLI
@@ -28,10 +26,10 @@ npm install
 npm link
 ```
 
-Verify the `autoecon` command is available:
+Verify the `fdx` command is available:
 
 ```bash
-autoecon
+fdx
 ```
 
 Should print usage info with `setup`, `status`, `call` commands.
@@ -39,7 +37,7 @@ Should print usage info with `setup`, `status`, `call` commands.
 ## 3. Run setup
 
 ```bash
-autoecon setup
+fdx setup
 ```
 
 This will:
@@ -49,43 +47,35 @@ This will:
 - Print an authorization URL — open it in your browser
 - Wait for the OAuth callback on `localhost:6274`
 - Exchange the code for tokens
-- Write tokens to `~/.openclaw/auth/wallet.json`
-- Copy the skill to `~/.openclaw/skills/autoecon/`
-- Configure `openclaw.json` automatically
+- Write tokens to `~/.fdx/auth.json`
 
-If the server is headless and you can't open a browser, run `autoecon setup` on your local machine instead, then `scp` the token file:
+If the machine is headless and you can't open a browser, run `fdx setup` on your local machine instead, then copy the token file:
 
 ```bash
 # From local machine
-scp ~/.openclaw/auth/wallet.json user@server:~/.openclaw/auth/wallet.json
-ssh user@server "chmod 600 ~/.openclaw/auth/wallet.json"
+scp ~/.fdx/auth.json user@server:~/.fdx/auth.json
+ssh user@server "chmod 600 ~/.fdx/auth.json"
 ```
 
-## 4. Restart the gateway
+## 4. Verify the CLI works
 
 ```bash
-openclaw gateway restart
+fdx status
+fdx call getMyInfo
+fdx call getAppVersion
 ```
 
-## 5. Verify the CLI works
+All three should return data. If `fdx call` fails with auth errors, run `fdx setup` again.
 
-```bash
-autoecon status
-autoecon call getMyInfo
-autoecon call getAppVersion
-```
+## 5. Environment Variables
 
-All three should return data. If `autoecon call` fails with auth errors, run `autoecon setup` again.
+| Variable           | Description        | Default                                |
+| ------------------ | ------------------ | -------------------------------------- |
+| `FDX_MCP_SERVER`   | MCP server URL     | `https://mcp.fd.xyz`                   |
+| `FDX_REDIRECT_URI` | OAuth callback URI | `http://localhost:6274/oauth/callback` |
+| `FDX_STORE_PATH`   | Token store path   | `~/.fdx/auth.json`                     |
 
-## 6. Test with the agent
-
-Ask the agent something like:
-
-- "What's my wallet address?"
-- "Show me my wallet overview"
-- "What version of the API is running?"
-
-The agent should read the skill instructions and run `autoecon call` commands to answer.
+You can also set these in a `.env` file in the working directory.
 
 ---
 
@@ -94,22 +84,33 @@ The agent should read the skill instructions and run `autoecon call` commands to
 When changes are pushed to the repo:
 
 ```bash
-cd ~/gh/openclaw-wallet
+cd fd-agent-wallet-cli
 git pull
 npm install
 npm link
-autoecon setup   # re-copies skill, re-checks config
 ```
 
-Start a new session to pick up skill changes.
+---
+
+## Running Tests
+
+```bash
+npm test
+```
+
+## Linting
+
+```bash
+npm run lint
+npm run lint:fix  # auto-fix
+```
 
 ---
 
 ## Troubleshooting
 
-| Problem                        | Fix                                                                                           |
-| ------------------------------ | --------------------------------------------------------------------------------------------- |
-| `autoecon: command not found`  | Run `npm link` in the repo dir                                                                |
-| Auth errors on `autoecon call` | Run `autoecon setup` to re-authenticate                                                       |
-| Agent doesn't see the skill    | Check `~/.openclaw/skills/autoecon/SKILL.md` exists and `openclaw.json` has the entry enabled |
-| Token expired                  | Auto-refreshes via refresh token. If refresh also expired, run `autoecon setup` again         |
+| Problem                   | Fix                                                                           |
+| ------------------------- | ----------------------------------------------------------------------------- |
+| `fdx: command not found`  | Run `npm link` in the repo directory                                          |
+| Auth errors on `fdx call` | Run `fdx setup` to re-authenticate                                            |
+| Token expired             | Auto-refreshes via refresh token. If that also expired, run `fdx setup` again |

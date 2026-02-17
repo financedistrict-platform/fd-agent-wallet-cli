@@ -1,7 +1,7 @@
 const { MCPAuthClient } = require('./mcp-auth');
 const { MCPClient } = require('./mcp-client');
 
-class AutoEconClient {
+class WalletClient {
   constructor({ mcpServerUrl, redirectUri, storePath, httpClient }) {
     if (!mcpServerUrl) throw new Error('mcpServerUrl is required');
     if (!redirectUri) throw new Error('redirectUri is required');
@@ -29,8 +29,8 @@ class AutoEconClient {
     return this.authClient.getAuthorizationUrl();
   }
 
-  async exchangeCodeForToken({ code, state }) {
-    return this.authClient.exchangeCodeForToken({ code, state });
+  async exchangeCodeForToken({ code, state, codeVerifier }) {
+    return this.authClient.exchangeCodeForToken({ code, state, codeVerifier });
   }
 
   async getMyInfo() {
@@ -245,4 +245,4 @@ class AutoEconClient {
   }
 }
 
-module.exports = { AutoEconClient };
+module.exports = { WalletClient };

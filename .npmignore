@@ -31,3 +31,7 @@ test/
 
 # CI/CD
 .github/
+
+# Docs (available on GitHub)
+CONTRIBUTING.md
+CHANGELOG.md

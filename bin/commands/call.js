@@ -1,4 +1,8 @@
+const { createSpinner } = require('nanospinner');
+const pc = require('picocolors');
+
 const { createClientFromEnv } = require('../../src');
+const { parseArgs } = require('../../src/utils/args');
 
 const METHODS = [
   'getMyInfo',
@@ -23,9 +27,9 @@ module.exports = async function call(argv) {
   const method = argv[0];
 
   if (!method || !METHODS.includes(method)) {
-    console.log('Usage: autoecon call <method> [--param value ...]');
+    console.log(`Usage: fdx call ${pc.cyan('<method>')} [--param value ...]`);
     console.log('');
-    console.log('Methods:');
+    console.log(pc.dim('Methods:'));
     for (const m of METHODS) {
       console.log(`  ${m}`);
     }
@@ -35,49 +39,22 @@ module.exports = async function call(argv) {
   const args = parseArgs(argv.slice(1));
   const client = createClientFromEnv();
 
+  const spinner = createSpinner(`Calling ${pc.cyan(method)}...`).start();
+
   try {
     const result = await client[method](args);
 
     if (result.error) {
+      spinner.error({ text: `${method} failed` });
       console.error(JSON.stringify({ error: result.error }, null, 2));
       process.exit(1);
     }
 
+    spinner.success({ text: `${method}` });
     console.log(JSON.stringify(result.data, null, 2));
   } catch (error) {
-    console.error(JSON.stringify({ error: { message: error.message } }, null, 2));
+    spinner.error({ text: `${method} failed` });
+    console.error(pc.red(error.message));
     process.exit(1);
   }
 };
-
-function parseArgs(argv) {
-  const args = {};
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-
-    if (arg.startsWith('--')) {
-      const key = arg.substring(2);
-      const value = argv[i + 1];
-
-      if (value === undefined || value.startsWith('--')) {
-        args[key] = true;
-      } else {
-        args[key] = parseValue(value);
-        i++;
-      }
-    }
-  }
-
-  return args;
-}
-
-function parseValue(value) {
-  if (value === 'true') return true;
-  if (value === 'false') return false;
-
-  const num = Number(value);
-  if (!isNaN(num) && value.trim() !== '') return num;
-
-  return value;
-}

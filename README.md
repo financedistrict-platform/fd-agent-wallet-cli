@@ -1,68 +1,97 @@
-# AutoEcon
+# FDX — Agent Wallet CLI
 
-[![npm version](https://img.shields.io/npm/v/@autoecon/openclaw-wallet)](https://www.npmjs.com/package/@autoecon/openclaw-wallet)
-[![CI](https://github.com/ermirbeqiraj/openclaw-wallet/actions/workflows/ci.yml/badge.svg)](https://github.com/ermirbeqiraj/openclaw-wallet/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/@1stdigital/fdx)](https://www.npmjs.com/package/@1stdigital/fdx)
+[![CI](https://github.com/1stdigital/fd-agent-wallet-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/1stdigital/fd-agent-wallet-cli/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Economic autonomy for your agent — no keys required.**
+A command-line interface to the [Finance District](https://fd.xyz) MCP wallet server. Gives AI agents crypto wallet capabilities — hold, send, swap, and earn yield on assets across multiple chains — without managing private keys.
 
-AutoEcon gives your OpenClaw AI agent a crypto wallet without the complexity of managing private keys, seed phrases, or network configurations. Your agent can hold, send, swap, and earn yield on crypto assets across multiple chains — all secured by OAuth 2.1, not by you managing secrets.
+## Why FDX?
 
-## Why AutoEcon?
+FDX is designed for AI agents and agent frameworks that need wallet tooling but don't natively support the [Model Context Protocol (MCP)](https://modelcontextprotocol.io). Instead of integrating an MCP client, agents invoke `fdx call <method>` from the command line and parse JSON output.
 
-- **No Key Management** — OAuth-secured wallet. No seed phrases. No private key files.
-- **Agent-Native** — Built for AI agents. Natural language commands via OpenClaw skills.
+- **No Key Management** — OAuth 2.1 secured. No seed phrases. No private key files.
+- **Agent-Native** — Structured JSON input/output designed for tool-calling agents.
 - **Multi-Chain** — Ethereum, BSC, Arbitrum, Base, Solana. One wallet, all chains.
 - **DeFi Enabled** — Transfer, swap, and earn yield through integrated DeFi protocols.
-- **Smart Account Architecture** — Account abstraction with multi-signature support.
+- **Smart Accounts** — Account abstraction with multi-signature support (ERC-4337).
 
 ## Quick Start
 
-Install globally via npm:
-
 ```bash
-npm install -g @autoecon/openclaw-wallet
+npm install -g @1stdigital/fdx
 ```
 
 Run the setup (opens browser for OAuth):
 
 ```bash
-autoecon setup
+fdx setup
 ```
 
-Restart your OpenClaw gateway:
+Check that authentication succeeded:
 
 ```bash
-openclaw gateway restart
+fdx status
 ```
-
-Done. Your agent now has a wallet.
 
 ## Usage
 
-Ask your OpenClaw agent:
+Invoke any MCP tool via the CLI:
 
-- _"What's my wallet address?"_
-- _"Show me my Ethereum balance"_
-- _"Send 0.1 ETH to 0xABC..."_
-- _"What DeFi yield strategies are available on Base?"_
+```bash
+# Check wallet overview
+fdx call getWalletOverview --chainKey ethereum
 
-The agent will use the `autoecon` CLI under the hood. All available commands and parameters are documented in the [skill reference](skill/autoecon/SKILL.md).
+# Send tokens
+fdx call transferTokens --chainKey ethereum --recipientAddress 0xABC... --amount 0.1
+
+# Discover yield strategies
+fdx call discoverYieldStrategies --chainKey base
+```
+
+All output is JSON, making it easy for agents to parse:
+
+```bash
+fdx call getMyInfo | jq '.email'
+```
+
+Run `fdx call` without arguments to see all available methods.
+
+## SDK Usage
+
+FDX can also be used as a Node.js library:
+
+```js
+const { createClientFromEnv } = require('@1stdigital/fdx');
+
+const client = createClientFromEnv();
+const result = await client.getWalletOverview({ chainKey: 'ethereum' });
+console.log(result.data);
+```
+
+## Configuration
+
+| Environment Variable | Description        | Default                                |
+| -------------------- | ------------------ | -------------------------------------- |
+| `FDX_MCP_SERVER`     | MCP server URL     | `https://mcp.fd.xyz`                   |
+| `FDX_REDIRECT_URI`   | OAuth callback URI | `http://localhost:6274/oauth/callback` |
+| `FDX_STORE_PATH`     | Token store path   | `~/.fdx/auth.json`                     |
 
 ## Documentation
 
-- **[skill/autoecon/SKILL.md](skill/autoecon/SKILL.md)** — Complete command reference for agents
-- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — System design overview
-- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — Running from source
-- **[docs/UNINSTALL.md](docs/UNINSTALL.md)** — Removal instructions
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — System design overview
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — Running from source
+- [docs/UNINSTALL.md](docs/UNINSTALL.md) — Removal instructions
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Support
 
-Found a bug or have a question?
-
-- **Issues**: [GitHub Issues](https://github.com/ermirbeqiraj/openclaw-wallet/issues)
-- **Source**: [GitHub Repository](https://github.com/ermirbeqiraj/openclaw-wallet)
+- **Issues**: [GitHub Issues](https://github.com/1stdigital/fd-agent-wallet-cli/issues)
+- **Source**: [GitHub Repository](https://github.com/1stdigital/fd-agent-wallet-cli)
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE) for details.

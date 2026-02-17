@@ -50,4 +50,7 @@ if (!command || !commands[command]) {
   process.exit(1);
 }
 
-commands[command]();
+commands[command]().catch((error) => {
+  console.error(error.message);
+  process.exit(1);
+});

@@ -6,10 +6,3 @@ coverage/
 .DS_Store
 npm-debug.log*
 *.log
-OPENCLAW_WALLET_STORE.test.json
-
-# External references/projects for study purposes
-.external
-
-# nearby place for tasks
-.todos

@@ -1,42 +1,42 @@
-const os = require('os');
-const path = require('path');
-
 const pc = require('picocolors');
 
-const { readStore } = require('../../src/storage');
+const { createClientFromEnv } = require('../../src');
 
 module.exports = async function status() {
-  const storePath = process.env.FDX_STORE_PATH || path.join(os.homedir(), '.fdx', 'auth.json');
+  const client = createClientFromEnv();
+  const storePath = client.authClient.storePath;
 
-  let store;
+  let state;
   try {
-    store = await readStore(storePath);
+    state = await client.getTokenState();
   } catch (error) {
     console.log(pc.red('Status: not configured'));
     console.log(`  ${pc.dim('Store path:')} ${storePath} (${error.message})`);
     process.exit(1);
   }
 
-  if (!store.tokens?.accessToken) {
+  if (!state.authenticated) {
     console.log(pc.yellow('Status: not authenticated'));
     console.log(`  ${pc.dim('Store path:')} ${storePath}`);
     console.log(`  Run ${pc.cyan('"fdx setup"')} to authenticate.`);
     process.exit(1);
   }
 
-  const expired = store.tokens.expiresAt && Date.now() >= store.tokens.expiresAt;
-  const hasRefresh = !!store.tokens.refreshToken;
-
-  const statusLabel = expired ? pc.yellow('token expired') : pc.green('authenticated');
+  const statusLabel = state.expired ? pc.yellow('token expired') : pc.green('authenticated');
   console.log(`Status: ${statusLabel}`);
   console.log(`  ${pc.dim('Store path:')}    ${storePath}`);
-  console.log(`  ${pc.dim('Client ID:')}     ${store.mcpAuth?.clientId || 'unknown'}`);
+  console.log(`  ${pc.dim('Client ID:')}     ${state.clientId || 'unknown'}`);
   console.log(
-    `  ${pc.dim('Token expires:')}  ${store.tokens.expiresAt ? new Date(store.tokens.expiresAt).toISOString() : 'unknown'}`,
+    `  ${pc.dim('Token expires:')}  ${state.expiresAt ? new Date(state.expiresAt).toISOString() : 'unknown'}`,
   );
-  console.log(`  ${pc.dim('Has refresh:')}   ${hasRefresh ? pc.green('yes') : pc.yellow('no')}`);
+  console.log(
+    `  ${pc.dim('Has refresh:')}   ${state.hasRefresh ? pc.green('yes') : pc.yellow('no')}`,
+  );
+  console.log(
+    `  ${pc.dim('Credentials:')}   ${state.usingCredentialStore ? pc.green('OS credential store') : pc.yellow('plaintext file')}`,
+  );
 
-  if (expired && !hasRefresh) {
+  if (state.expired && !state.hasRefresh) {
     console.log('');
     console.log(
       pc.red('Token expired and no refresh token.') +
@@ -45,7 +45,7 @@ module.exports = async function status() {
     process.exit(1);
   }
 
-  if (expired && hasRefresh) {
+  if (state.expired && state.hasRefresh) {
     console.log('');
     console.log(
       pc.dim('Token expired but refresh token available. Will auto-refresh on next call.'),

@@ -33,6 +33,10 @@ class WalletClient {
     return this.authClient.exchangeCodeForToken({ code, state, codeVerifier });
   }
 
+  async getTokenState() {
+    return this.authClient.getTokenState();
+  }
+
   async getMyInfo() {
     return this.mcpClient.callTool('getMyInfo', {});
   }

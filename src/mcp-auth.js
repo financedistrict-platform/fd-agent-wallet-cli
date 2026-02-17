@@ -1,10 +1,11 @@
 const axios = require('axios');
 
+const defaultCredentialStore = require('./credential-store');
 const { readStore, writeStore } = require('./storage');
 const { generateCodeChallenge, generateCodeVerifier, generateState } = require('./utils/pkce');
 
 class MCPAuthClient {
-  constructor({ mcpServerUrl, redirectUri, storePath, httpClient }) {
+  constructor({ mcpServerUrl, redirectUri, storePath, httpClient, credentialStore }) {
     if (!mcpServerUrl) throw new Error('mcpServerUrl is required');
     if (!redirectUri) throw new Error('redirectUri is required');
     if (!storePath) throw new Error('storePath is required');
@@ -22,6 +23,7 @@ class MCPAuthClient {
     this.redirectUri = redirectUri;
     this.storePath = storePath;
     this.httpClient = httpClient || axios.create();
+    this._credentialStore = credentialStore || defaultCredentialStore;
     this._initialized = false;
   }
 
@@ -143,7 +145,7 @@ class MCPAuthClient {
   }
 
   async getAccessToken() {
-    const tokens = await this.#getStoreProperty('tokens');
+    const tokens = await this.#getTokens();
     if (!tokens?.accessToken) {
       throw new Error('No access token available');
     }
@@ -158,7 +160,7 @@ class MCPAuthClient {
   async refreshToken() {
     await this.initialize();
 
-    const tokens = await this.#getStoreProperty('tokens');
+    const tokens = await this.#getTokens();
     if (!tokens?.refreshToken) {
       throw new Error('No refresh token available');
     }
@@ -177,16 +179,75 @@ class MCPAuthClient {
     return data.access_token;
   }
 
+  async getTokenState() {
+    const store = await this.#readStore();
+    const tokens = await this.#getTokens();
+
+    return {
+      authenticated: !!tokens?.accessToken,
+      expired: tokens?.expiresAt ? Date.now() >= tokens.expiresAt : false,
+      hasRefresh: !!tokens?.refreshToken,
+      expiresAt: tokens?.expiresAt,
+      clientId: store.mcpAuth?.clientId,
+      usingCredentialStore: !!store.tokens?.credentialStore,
+    };
+  }
+
+  #credentialAccount() {
+    return new URL(this.mcpServerUrl).host;
+  }
+
+  async #getTokens() {
+    const store = await this.#readStore();
+    const tokens = store.tokens;
+    if (!tokens) return null;
+
+    if (tokens.credentialStore) {
+      try {
+        const raw = this._credentialStore.getSecret(this.#credentialAccount());
+        if (raw) {
+          const secrets = JSON.parse(raw);
+          return { ...tokens, ...secrets };
+        }
+      } catch {
+        // Credential store read failed — return metadata only
+      }
+      return tokens;
+    }
+
+    // Legacy: tokens are stored inline in the file
+    return tokens;
+  }
+
   async #persistTokens(tokenResponse) {
     const store = await this.#readStore();
     const expiresInMs = (tokenResponse.expires_in || 0) * 1000;
+    const accessToken = tokenResponse.access_token;
+    const refreshToken =
+      tokenResponse.refresh_token || tokenResponse.refreshToken || store.tokens?.refreshToken;
+
+    const stored = this._credentialStore.setSecret(
+      this.#credentialAccount(),
+      JSON.stringify({ accessToken, refreshToken }),
+    );
+
     store.tokens = {
-      accessToken: tokenResponse.access_token,
-      refreshToken: tokenResponse.refresh_token || store.tokens?.refreshToken,
       scope: tokenResponse.scope,
       tokenType: tokenResponse.token_type || 'Bearer',
       expiresAt: expiresInMs ? Date.now() + expiresInMs : undefined,
     };
+
+    if (stored) {
+      store.tokens.credentialStore = true;
+    } else {
+      store.tokens.accessToken = accessToken;
+      store.tokens.refreshToken = refreshToken;
+      process.emitWarning(
+        'OS credential store not available. Tokens stored in plaintext at ' + this.storePath,
+        'SecurityWarning',
+      );
+    }
+
     await writeStore(store, this.storePath);
   }
 
@@ -194,11 +255,6 @@ class MCPAuthClient {
     const store = await this.#readStore();
     store.mcpAuth = mcpAuth;
     await writeStore(store, this.storePath);
-  }
-
-  async #getStoreProperty(property) {
-    const store = await this.#readStore();
-    return store[property];
   }
 
   async #readStore() {

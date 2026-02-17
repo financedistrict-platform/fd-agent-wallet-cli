@@ -234,6 +234,36 @@ describe('MCPClient', () => {
       const tools = await client.listTools();
       assert.deepStrictEqual(tools, [{ name: 'testTool' }]);
     });
+
+    it('should retry on 401 then succeed', async () => {
+      let callCount = 0;
+      const auth = mockAuthClient();
+      const client = new MCPClient({
+        mcpServerUrl: 'https://example.com',
+        authClient: auth,
+      });
+
+      client.connect = async function () {
+        await this.authClient.getAccessToken();
+        this._client = {
+          listTools: async () => {
+            callCount++;
+            if (callCount === 1) {
+              const err = new Error('Unauthorized');
+              err.httpStatusCode = 401;
+              throw err;
+            }
+            return { tools: [{ name: 'retried' }] };
+          },
+          callTool: async () => ({ content: [] }),
+        };
+        this._transport = { close: async () => {} };
+      };
+
+      const tools = await client.listTools();
+      assert.deepStrictEqual(tools, [{ name: 'retried' }]);
+      assert.strictEqual(auth.refreshCalled, true);
+    });
   });
 
   describe('close', () => {

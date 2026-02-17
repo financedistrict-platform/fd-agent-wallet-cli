@@ -4,7 +4,7 @@ const {
 } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
 
 const CLIENT_NAME = 'fdx';
-const CLIENT_VERSION = '0.1.0';
+const CLIENT_VERSION = require('../package.json').version;
 
 class MCPClient {
   constructor({ mcpServerUrl, authClient }) {
@@ -98,10 +98,19 @@ class MCPClient {
     }
   }
 
-  async listTools() {
-    if (!this._client) await this.connect();
-    const result = await this._client.listTools();
-    return result.tools;
+  async listTools(retried = false) {
+    try {
+      if (!this._client) await this.connect();
+      const result = await this._client.listTools();
+      return result.tools;
+    } catch (error) {
+      if (!retried && isAuthError(error)) {
+        await this.close();
+        await this.authClient.refreshToken();
+        return this.listTools(true);
+      }
+      throw error;
+    }
   }
 
   async close() {

@@ -31,11 +31,16 @@ module.exports = async function setup() {
 
   const callbackSpinner = createSpinner('Waiting for callback...').start();
 
-  const code = await waitForCallback(port, client.authClient.redirectUri);
+  const callback = await waitForCallback(port, client.authClient.redirectUri);
   callbackSpinner.success({ text: 'Callback received' });
 
+  if (callback.state !== state) {
+    console.error(pc.red('OAuth state mismatch — possible CSRF attack. Aborting.'));
+    process.exit(1);
+  }
+
   const tokenSpinner = createSpinner('Exchanging code for token...').start();
-  const tokens = await client.exchangeCodeForToken({ code, state, codeVerifier });
+  const tokens = await client.exchangeCodeForToken({ code: callback.code, state, codeVerifier });
   tokenSpinner.success({ text: 'Authentication successful' });
 
   console.log('');
@@ -85,11 +90,12 @@ function waitForCallback(port, redirectUri) {
         }
 
         if (code) {
+          const callbackState = url.searchParams.get('state');
           res.writeHead(200, { 'Content-Type': 'text/html' });
           res.end('<html><body><h1>Success</h1><p>You can close this window.</p></body></html>');
           server.close();
           clearTimeout(timer);
-          resolve(code);
+          resolve({ code, state: callbackState });
           return;
         }
       }

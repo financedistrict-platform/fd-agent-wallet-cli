@@ -15,9 +15,9 @@ describe('CLI Argument Parser', () => {
       assert.deepStrictEqual(args, { verbose: true, debug: true });
     });
 
-    it('should parse number arguments', () => {
+    it('should keep numeric arguments as strings', () => {
       const args = parseArgs(['--port', '8080', '--count', '42']);
-      assert.deepStrictEqual(args, { port: 8080, count: 42 });
+      assert.deepStrictEqual(args, { port: '8080', count: '42' });
     });
 
     it('should parse "true" and "false" as booleans', () => {
@@ -27,7 +27,7 @@ describe('CLI Argument Parser', () => {
 
     it('should handle mixed argument types', () => {
       const args = parseArgs(['--name', 'Bob', '--age', '30', '--active', 'true', '--verbose']);
-      assert.deepStrictEqual(args, { name: 'Bob', age: 30, active: true, verbose: true });
+      assert.deepStrictEqual(args, { name: 'Bob', age: '30', active: true, verbose: true });
     });
 
     it('should handle empty argv', () => {
@@ -50,14 +50,30 @@ describe('CLI Argument Parser', () => {
       assert.deepStrictEqual(args, { flag1: true, flag2: true, name: 'test' });
     });
 
-    it('should parse decimal numbers', () => {
+    it('should preserve decimal values as strings', () => {
       const args = parseArgs(['--amount', '0.5', '--price', '99.99']);
-      assert.deepStrictEqual(args, { amount: 0.5, price: 99.99 });
+      assert.deepStrictEqual(args, { amount: '0.5', price: '99.99' });
     });
 
-    it('should parse number-like string with whitespace', () => {
-      const args = parseArgs(['--value', ' 123 ']);
-      assert.strictEqual(args.value, 123);
+    it('should preserve large numbers as strings without precision loss', () => {
+      const big = '99999999999999999';
+      const args = parseArgs(['--amount', big]);
+      assert.strictEqual(args.amount, big);
+    });
+
+    it('should support --key=value syntax', () => {
+      const args = parseArgs(['--name=Alice', '--chainKey=ethereum']);
+      assert.deepStrictEqual(args, { name: 'Alice', chainKey: 'ethereum' });
+    });
+
+    it('should support --key=value with equals in value', () => {
+      const args = parseArgs(['--filter=a=b']);
+      assert.strictEqual(args.filter, 'a=b');
+    });
+
+    it('should skip bare --', () => {
+      const args = parseArgs(['--', '--name', 'test']);
+      assert.deepStrictEqual(args, { name: 'test' });
     });
   });
 
@@ -70,15 +86,15 @@ describe('CLI Argument Parser', () => {
       assert.strictEqual(parseValue('false'), false);
     });
 
-    it('should parse integer strings as numbers', () => {
-      assert.strictEqual(parseValue('42'), 42);
-      assert.strictEqual(parseValue('0'), 0);
-      assert.strictEqual(parseValue('-10'), -10);
+    it('should keep integer strings as strings', () => {
+      assert.strictEqual(parseValue('42'), '42');
+      assert.strictEqual(parseValue('0'), '0');
+      assert.strictEqual(parseValue('-10'), '-10');
     });
 
-    it('should parse decimal strings as numbers', () => {
-      assert.strictEqual(parseValue('3.14'), 3.14);
-      assert.strictEqual(parseValue('0.001'), 0.001);
+    it('should keep decimal strings as strings', () => {
+      assert.strictEqual(parseValue('3.14'), '3.14');
+      assert.strictEqual(parseValue('0.001'), '0.001');
     });
 
     it('should preserve hex strings as strings', () => {

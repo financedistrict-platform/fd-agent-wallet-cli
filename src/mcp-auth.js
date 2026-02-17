@@ -25,11 +25,21 @@ class MCPAuthClient {
     this.httpClient = httpClient || axios.create();
     this._credentialStore = credentialStore || defaultCredentialStore;
     this._initialized = false;
+    this._initPromise = null;
   }
 
   async initialize() {
     if (this._initialized) return;
+    if (this._initPromise) return this._initPromise;
+    this._initPromise = this.#doInitialize();
+    try {
+      await this._initPromise;
+    } finally {
+      this._initPromise = null;
+    }
+  }
 
+  async #doInitialize() {
     const store = await this.#readStore();
     const cached = store.mcpAuth;
 
@@ -121,6 +131,9 @@ class MCPAuthClient {
   async exchangeCodeForToken({ code, state, codeVerifier }) {
     await this.initialize();
 
+    if (!code) {
+      throw new Error('code is required');
+    }
     if (!codeVerifier) {
       throw new Error('codeVerifier is required');
     }

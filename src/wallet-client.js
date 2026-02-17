@@ -17,7 +17,6 @@ class WalletClient {
     this.mcpClient = new MCPClient({
       mcpServerUrl,
       authClient: this.authClient,
-      httpClient,
     });
   }
 
@@ -35,6 +34,14 @@ class WalletClient {
 
   async getTokenState() {
     return this.authClient.getTokenState();
+  }
+
+  async listTools() {
+    return this.mcpClient.listTools();
+  }
+
+  async close() {
+    return this.mcpClient.close();
   }
 
   async getMyInfo() {

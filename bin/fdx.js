@@ -41,6 +41,13 @@ program
   });
 
 program
+  .command('logout')
+  .description('Remove stored credentials')
+  .action(async () => {
+    await require('./commands/logout')();
+  });
+
+program
   .command('call')
   .description('Invoke an MCP tool')
   .argument('<method>', 'tool name to invoke')

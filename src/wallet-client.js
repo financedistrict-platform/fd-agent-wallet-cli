@@ -48,6 +48,10 @@ class WalletClient {
     return this.authClient.getTokenState();
   }
 
+  async logout() {
+    return this.authClient.logout();
+  }
+
   async listTools() {
     return this.mcpClient.listTools();
   }

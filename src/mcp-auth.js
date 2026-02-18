@@ -304,6 +304,22 @@ class MCPAuthClient {
     };
   }
 
+  async logout() {
+    // Remove tokens from OS credential store
+    this._credentialStore.deleteSecret(this.#credentialAccount());
+
+    // Clear tokens from the store file but keep mcpAuth (client registrations)
+    // so the next `fdx setup` skips DCR and goes straight to auth
+    const store = await this.#readStore();
+    delete store.tokens;
+    await writeStore(store, this.storePath);
+
+    // Reset in-memory token state
+    this._initialized = false;
+    this._deviceInitialized = false;
+    this._discovered = false;
+  }
+
   #credentialAccount() {
     return new URL(this.mcpServerUrl).host;
   }

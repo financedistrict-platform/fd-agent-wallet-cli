@@ -23,6 +23,7 @@ describe('CLI method list sync', () => {
       'getAuthorizationUrl',
       'exchangeCodeForToken',
       'getTokenState',
+      'logout',
       'startDeviceFlow',
       'pollDeviceToken',
       'listTools',

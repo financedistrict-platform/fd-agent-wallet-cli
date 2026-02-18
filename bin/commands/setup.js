@@ -6,37 +6,71 @@ const pc = require('picocolors');
 
 const { createClientFromEnv } = require('../../src');
 
-module.exports = async function setup() {
+module.exports = async function setup({ device = false } = {}) {
   const client = createClientFromEnv();
-  const port = new URL(client.authClient.redirectUri).port || 6274;
 
-  console.log(pc.bold('FDX - Setup'));
+  console.log(pc.bold(`FDX - Setup${device ? ' (Device Flow)' : ''}`));
   console.log('');
   console.log(`${pc.dim('MCP Server:')}   ${client.authClient.mcpServerUrl}`);
-  console.log(`${pc.dim('Redirect URI:')} ${client.authClient.redirectUri}`);
+  if (!device) {
+    console.log(`${pc.dim('Redirect URI:')} ${client.authClient.redirectUri}`);
+  }
   console.log(`${pc.dim('Store Path:')}   ${client.authClient.storePath}`);
   console.log('');
 
-  const initSpinner = createSpinner('Registering client...').start();
-  await client.initialize();
-  initSpinner.success({ text: `Client ID: ${pc.cyan(client.authClient.clientId)}` });
-  console.log('');
+  let tokens;
 
-  const { url, state, codeVerifier } = await client.getAuthorizationUrl();
+  if (device) {
+    const initSpinner = createSpinner('Registering device client...').start();
+    await client.initializeForDevice();
+    initSpinner.success({ text: `Client ID: ${pc.cyan(client.authClient.deviceClientId)}` });
+    console.log('');
 
-  console.log('Open this URL in your browser:');
-  console.log('');
-  console.log(pc.underline(url));
-  console.log('');
+    const deviceSpinner = createSpinner('Requesting device code...').start();
+    const deviceInfo = await client.startDeviceFlow();
+    deviceSpinner.success({ text: 'Device code received' });
 
-  const callbackSpinner = createSpinner('Waiting for callback...').start();
+    console.log('');
+    console.log(pc.bold('─'.repeat(58)));
+    console.log(`  ${pc.dim('Verification URL:')} ${pc.underline(deviceInfo.verificationUri)}`);
+    console.log(`  ${pc.bold('Enter code:')}       ${pc.cyan(pc.bold(deviceInfo.userCode))}`);
+    console.log(pc.bold('─'.repeat(58)));
+    console.log('');
 
-  const code = await waitForCallback(port, client.authClient.redirectUri);
-  callbackSpinner.success({ text: 'Callback received' });
+    const pollSpinner = createSpinner('Waiting for authorization...').start();
+    tokens = await client.pollDeviceToken({
+      deviceCode: deviceInfo.deviceCode,
+      interval: deviceInfo.interval,
+    });
+    pollSpinner.success({ text: 'Authentication successful' });
+  } else {
+    const initSpinner = createSpinner('Registering client...').start();
+    await client.initialize();
+    initSpinner.success({ text: `Client ID: ${pc.cyan(client.authClient.clientId)}` });
+    console.log('');
 
-  const tokenSpinner = createSpinner('Exchanging code for token...').start();
-  const tokens = await client.exchangeCodeForToken({ code, state, codeVerifier });
-  tokenSpinner.success({ text: 'Authentication successful' });
+    const port = new URL(client.authClient.redirectUri).port || 6260;
+    const { url, state, codeVerifier } = await client.getAuthorizationUrl();
+
+    console.log('Open this URL in your browser:');
+    console.log('');
+    console.log(pc.underline(url));
+    console.log('');
+
+    const callbackSpinner = createSpinner('Waiting for callback...').start();
+
+    const callback = await waitForCallback(port, client.authClient.redirectUri);
+    callbackSpinner.success({ text: 'Callback received' });
+
+    if (callback.state !== state) {
+      console.error(pc.red('OAuth state mismatch — possible CSRF attack. Aborting.'));
+      process.exit(1);
+    }
+
+    const tokenSpinner = createSpinner('Exchanging code for token...').start();
+    tokens = await client.exchangeCodeForToken({ code: callback.code, state, codeVerifier });
+    tokenSpinner.success({ text: 'Authentication successful' });
+  }
 
   console.log('');
   console.log(`  ${pc.dim('Token Type:')}  ${tokens.token_type}`);
@@ -85,11 +119,12 @@ function waitForCallback(port, redirectUri) {
         }
 
         if (code) {
+          const callbackState = url.searchParams.get('state');
           res.writeHead(200, { 'Content-Type': 'text/html' });
           res.end('<html><body><h1>Success</h1><p>You can close this window.</p></body></html>');
           server.close();
           clearTimeout(timer);
-          resolve(code);
+          resolve({ code, state: callbackState });
           return;
         }
       }

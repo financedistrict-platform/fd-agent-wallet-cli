@@ -21,7 +21,7 @@ function createClientFromEnv() {
 
   return new WalletClient({
     mcpServerUrl,
-    redirectUri: redirectUri || `http://localhost:6274/oauth/callback`,
+    redirectUri: redirectUri || `http://localhost:6260/oauth/callback`,
     storePath: storePath || path.join(os.homedir(), '.fdx', 'auth.json'),
   });
 }

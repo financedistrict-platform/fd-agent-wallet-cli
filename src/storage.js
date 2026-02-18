@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const fs = require('fs/promises');
 const path = require('path');
 
@@ -24,8 +25,11 @@ async function writeStore(payload, storePath) {
 
   await ensureDirectoryExists(storePath);
   const json = JSON.stringify(payload, null, 2);
-  await fs.writeFile(storePath, `${json}\n`, { mode: 0o600 });
-  await fs.chmod(storePath, 0o600);
+  const tmpPath = `${storePath}.${crypto.randomBytes(4).toString('hex')}.tmp`;
+  // Note: mode flags are POSIX-only and have no effect on Windows.
+  // On Windows, file access is governed by the user's NTFS permissions.
+  await fs.writeFile(tmpPath, `${json}\n`, { mode: 0o600 });
+  await fs.rename(tmpPath, storePath);
 }
 
 module.exports = {

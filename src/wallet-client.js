@@ -17,7 +17,6 @@ class WalletClient {
     this.mcpClient = new MCPClient({
       mcpServerUrl,
       authClient: this.authClient,
-      httpClient,
     });
   }
 
@@ -25,8 +24,20 @@ class WalletClient {
     return this.authClient.initialize();
   }
 
+  async initializeForDevice() {
+    return this.authClient.initializeForDevice();
+  }
+
   async getAuthorizationUrl() {
     return this.authClient.getAuthorizationUrl();
+  }
+
+  async startDeviceFlow() {
+    return this.authClient.startDeviceFlow();
+  }
+
+  async pollDeviceToken({ deviceCode, interval }) {
+    return this.authClient.pollDeviceToken({ deviceCode, interval });
   }
 
   async exchangeCodeForToken({ code, state, codeVerifier }) {
@@ -35,6 +46,14 @@ class WalletClient {
 
   async getTokenState() {
     return this.authClient.getTokenState();
+  }
+
+  async listTools() {
+    return this.mcpClient.listTools();
+  }
+
+  async close() {
+    return this.mcpClient.close();
   }
 
   async getMyInfo() {

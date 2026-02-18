@@ -1,86 +1,74 @@
-const axios = require('axios');
+const { Client } = require('@modelcontextprotocol/sdk/client');
+const {
+  StreamableHTTPClientTransport,
+} = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
+
+const CLIENT_NAME = 'fdx';
+const CLIENT_VERSION = require('../package.json').version;
 
 class MCPClient {
-  #requestId = 0;
-
-  constructor({ mcpServerUrl, authClient, httpClient }) {
+  constructor({ mcpServerUrl, authClient }) {
     if (!mcpServerUrl) throw new Error('mcpServerUrl is required');
     if (!authClient) throw new Error('authClient is required');
 
     this.mcpServerUrl = mcpServerUrl.replace(/\/$/, '');
     this.authClient = authClient;
-    this.httpClient = httpClient || axios.create();
+    this._client = null;
+    this._transport = null;
+  }
+
+  async connect() {
+    await this.close();
+
+    const accessToken = await this.authClient.getAccessToken();
+
+    this._transport = new StreamableHTTPClientTransport(new URL(this.mcpServerUrl), {
+      requestInit: {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    });
+
+    this._client = new Client({ name: CLIENT_NAME, version: CLIENT_VERSION }, { capabilities: {} });
+
+    await this._client.connect(this._transport);
   }
 
   async callTool(toolName, args, retried = false) {
     if (!toolName) throw new Error('toolName is required');
 
-    const arguments_ = args || {};
+    try {
+      if (!this._client) await this.connect();
 
-    const payload = {
-      jsonrpc: '2.0',
-      id: ++this.#requestId,
-      method: 'tools/call',
-      params: {
+      const result = await this._client.callTool({
         name: toolName,
-        arguments: arguments_,
-      },
-    };
-
-    let accessToken;
-    try {
-      accessToken = await this.authClient.getAccessToken();
-    } catch (error) {
-      return {
-        error: {
-          code: 'AUTH_ERROR',
-          message: `Failed to get access token: ${error.message}`,
-        },
-      };
-    }
-
-    try {
-      const response = await this.httpClient.post(this.mcpServerUrl, payload, {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        timeout: 45000,
+        arguments: args || {},
       });
 
-      let responseData = response.data;
+      if (result.isError) {
+        const message = result.content?.[0]?.text || 'Tool returned an error';
+        return { error: { code: 'TOOL_ERROR', message } };
+      }
 
-      if (typeof responseData === 'string' && responseData.startsWith('event: message')) {
-        for (const line of responseData.split('\n')) {
-          if (line.startsWith('data: ')) {
-            responseData = JSON.parse(line.substring(6));
-            break;
+      for (const item of result.content || []) {
+        if (item.type === 'text' && item.text) {
+          try {
+            return { data: JSON.parse(item.text) };
+          } catch {
+            return { data: item.text };
           }
         }
       }
 
-      if (responseData.error) {
-        return { error: responseData.error };
-      }
-
-      if (responseData.result?.content) {
-        for (const contentItem of responseData.result.content) {
-          if (contentItem.type === 'text' && contentItem.text) {
-            try {
-              return { data: JSON.parse(contentItem.text) };
-            } catch {
-              return { data: contentItem.text };
-            }
-          }
-        }
-      }
-
-      return { data: responseData };
+      return { data: result.content };
     } catch (error) {
-      if (error.response?.status === 401 && !retried) {
+      // Handle auth failures — reconnect with refreshed token once
+      if (!retried && isAuthError(error)) {
         try {
+          await this.close();
           await this.authClient.refreshToken();
-          return this.callTool(toolName, arguments_, true);
+          return this.callTool(toolName, args, true);
         } catch (refreshError) {
           return {
             error: {
@@ -91,15 +79,59 @@ class MCPClient {
         }
       }
 
+      // Auth error that we already retried, or getAccessToken failed initially
+      if (isAuthError(error)) {
+        return {
+          error: {
+            code: 'AUTH_ERROR',
+            message: `Authentication failed: ${error.message}`,
+          },
+        };
+      }
+
       return {
         error: {
           code: 'REQUEST_ERROR',
-          message: error.response?.data?.message || error.message,
-          details: error.response?.data,
+          message: error.message,
         },
       };
     }
   }
+
+  async listTools(retried = false) {
+    try {
+      if (!this._client) await this.connect();
+      const result = await this._client.listTools();
+      return result.tools;
+    } catch (error) {
+      if (!retried && isAuthError(error)) {
+        await this.close();
+        await this.authClient.refreshToken();
+        return this.listTools(true);
+      }
+      throw error;
+    }
+  }
+
+  async close() {
+    try {
+      await this._transport?.close();
+    } catch {
+      // Ignore close errors
+    }
+    this._client = null;
+    this._transport = null;
+  }
+}
+
+function isAuthError(error) {
+  const msg = error?.message?.toLowerCase() || '';
+  return (
+    error?.httpStatusCode === 401 ||
+    msg.includes('unauthorized') ||
+    msg.includes('401') ||
+    msg.includes('no access token')
+  );
 }
 
 module.exports = { MCPClient };

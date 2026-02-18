@@ -7,7 +7,7 @@ function createClient() {
   const calls = [];
   const client = new WalletClient({
     mcpServerUrl: 'https://mcp.example.com',
-    redirectUri: 'http://localhost:6274/oauth/callback',
+    redirectUri: 'http://localhost:6260/oauth/callback',
     storePath: '/tmp/fdx-test.json',
   });
 
@@ -26,7 +26,7 @@ describe('WalletClient', () => {
       assert.throws(
         () =>
           new WalletClient({
-            redirectUri: 'http://localhost:6274/oauth/callback',
+            redirectUri: 'http://localhost:6260/oauth/callback',
             storePath: '/tmp/test.json',
           }),
         /mcpServerUrl is required/,
@@ -49,7 +49,7 @@ describe('WalletClient', () => {
         () =>
           new WalletClient({
             mcpServerUrl: 'https://example.com',
-            redirectUri: 'http://localhost:6274/oauth/callback',
+            redirectUri: 'http://localhost:6260/oauth/callback',
           }),
         /storePath is required/,
       );

@@ -92,11 +92,21 @@ function setSecret(account, secret) {
   try {
     switch (process.platform) {
       case 'darwin':
-        execFileSync(
-          'security',
-          ['add-generic-password', '-U', '-a', account, '-s', SERVICE, '-w', secret],
-          { stdio: 'pipe', timeout: TIMEOUT },
-        );
+        // Delete existing entry first (add-generic-password -U can be unreliable)
+        try {
+          execFileSync('security', ['delete-generic-password', '-a', account, '-s', SERVICE], {
+            stdio: 'pipe',
+            timeout: TIMEOUT,
+          });
+        } catch {
+          // Entry may not exist — ignore
+        }
+        // Use -w with stdin to avoid leaking the secret in process arguments
+        execFileSync('security', ['add-generic-password', '-a', account, '-s', SERVICE, '-w'], {
+          input: secret,
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: TIMEOUT,
+        });
         return true;
 
       case 'linux':

@@ -56,5 +56,7 @@ module.exports = async function call(argv) {
     spinner.error({ text: `${method} failed` });
     console.error(pc.red(error.message));
     process.exit(1);
+  } finally {
+    await client.close().catch(() => {});
   }
 };

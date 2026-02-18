@@ -33,6 +33,7 @@
   },
   "homepage": "https://github.com/1stdigital/fd-agent-wallet-cli#readme",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "axios": "^1.13.5",
     "commander": "^14.0.3",
     "dotenv": "^16.6.1",

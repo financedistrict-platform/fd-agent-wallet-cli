@@ -5,7 +5,19 @@ function parseArgs(argv) {
     const arg = argv[i];
 
     if (arg.startsWith('--')) {
-      const key = arg.substring(2);
+      const rest = arg.substring(2);
+
+      // Support --key=value syntax
+      const eqIdx = rest.indexOf('=');
+      if (eqIdx !== -1) {
+        const key = rest.substring(0, eqIdx);
+        if (key) args[key] = parseValue(rest.substring(eqIdx + 1));
+        continue;
+      }
+
+      const key = rest;
+      if (!key) continue;
+
       const value = argv[i + 1];
 
       if (value === undefined || value.startsWith('--')) {
@@ -24,12 +36,8 @@ function parseValue(value) {
   if (value === 'true') return true;
   if (value === 'false') return false;
 
-  // Preserve hex strings (e.g. Ethereum addresses like 0xABC...)
-  if (/^0x/i.test(value)) return value;
-
-  const num = Number(value);
-  if (!isNaN(num) && value.trim() !== '') return num;
-
+  // All other values stay as strings — no numeric coercion.
+  // Financial amounts, addresses, and IDs must not lose precision.
   return value;
 }
 

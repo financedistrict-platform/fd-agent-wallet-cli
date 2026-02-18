@@ -14,7 +14,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/financedistrict/fd-agent-wallet-cli.git"
+    "url": "git+https://github.com/financedistrict-platform/fd-agent-wallet-cli.git"
   },
   "keywords": [
     "fdx",
@@ -29,9 +29,9 @@
   "author": "Finance District",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/financedistrict/fd-agent-wallet-cli/issues"
+    "url": "https://github.com/financedistrict-platform/fd-agent-wallet-cli/issues"
   },
-  "homepage": "https://github.com/financedistrict/fd-agent-wallet-cli#readme",
+  "homepage": "https://github.com/financedistrict-platform/fd-agent-wallet-cli#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
     "axios": "^1.13.5",
@@ -50,5 +50,8 @@
   "type": "commonjs",
   "engines": {
     "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

@@ -34,7 +34,7 @@ Use clear, descriptive commit messages. Prefer the imperative mood:
 
 ## Reporting Issues
 
-- Use [GitHub Issues](https://github.com/financedistrict/fd-agent-wallet-cli/issues) to report bugs or request features.
+- Use [GitHub Issues](https://github.com/financedistrict-platform/fd-agent-wallet-cli/issues) to report bugs or request features.
 - Include steps to reproduce, expected vs. actual behavior, and your Node.js version.
 
 ## License

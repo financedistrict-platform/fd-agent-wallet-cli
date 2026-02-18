@@ -1,7 +1,7 @@
 # FDX — Agent Wallet CLI
 
 [![npm version](https://img.shields.io/npm/v/@financedistrict/fdx)](https://www.npmjs.com/package/@financedistrict/fdx)
-[![CI](https://github.com/financedistrict/fd-agent-wallet-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/financedistrict/fd-agent-wallet-cli/actions/workflows/ci.yml)
+[![CI](https://github.com/financedistrict-platform/fd-agent-wallet-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/financedistrict-platform/fd-agent-wallet-cli/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A command-line interface to the [Finance District](https://fd.xyz) MCP wallet server. Gives AI agents crypto wallet capabilities — hold, send, swap, and earn yield on assets across multiple chains — without managing private keys.
@@ -42,7 +42,7 @@ fdx logout
 
 ## Authentication
 
-FDX uses OAuth 2.1 with [Microsoft Entra External ID](https://learn.microsoft.com/en-us/entra/external-id/). Authentication is always tied to a user identity — the agent acts as a delegate on the user's behalf.
+FDX uses OAuth 2.1 with. Authentication is always tied to a user identity — the agent acts as a delegate on the user's behalf.
 
 ### Interactive flow (default)
 
@@ -146,8 +146,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/financedistrict/fd-agent-wallet-cli/issues)
-- **Source**: [GitHub Repository](https://github.com/financedistrict/fd-agent-wallet-cli)
+- **Issues**: [GitHub Issues](https://github.com/financedistrict-platform/fd-agent-wallet-cli/issues)
+- **Source**: [GitHub Repository](https://github.com/financedistrict-platform/fd-agent-wallet-cli)
 
 ## License
 

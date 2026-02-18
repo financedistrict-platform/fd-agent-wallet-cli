@@ -89,10 +89,11 @@ class MCPClient {
         };
       }
 
+      const statusSuffix = error?.code > 0 ? ` (HTTP ${error.code})` : '';
       return {
         error: {
           code: 'REQUEST_ERROR',
-          message: error.message,
+          message: `${error.message}${statusSuffix}`,
         },
       };
     }
@@ -127,6 +128,7 @@ class MCPClient {
 function isAuthError(error) {
   const msg = error?.message?.toLowerCase() || '';
   return (
+    error?.code === 401 || // StreamableHTTPError stores status in .code
     error?.httpStatusCode === 401 ||
     msg.includes('unauthorized') ||
     msg.includes('401') ||

@@ -221,6 +221,48 @@ describe('MCPClient', () => {
       assert.strictEqual(result.error.code, 'REQUEST_ERROR');
       assert.ok(result.error.message.includes('Connection timeout'));
     });
+
+    it('should retry on StreamableHTTPError with code 401 (real SDK error shape)', async () => {
+      let callCount = 0;
+      const auth = mockAuthClient();
+      const client = new MCPClient({
+        mcpServerUrl: 'https://example.com',
+        authClient: auth,
+      });
+
+      injectMockSDKClient(client, async () => {
+        callCount++;
+        if (callCount === 1) {
+          // Simulate the real StreamableHTTPError from @modelcontextprotocol/sdk
+          const err = new Error('Streamable HTTP error: Error POSTing to endpoint: ');
+          err.code = 401;
+          throw err;
+        }
+        return { content: [{ type: 'text', text: '"ok"' }] };
+      });
+
+      const result = await client.callTool('test');
+      assert.strictEqual(result.data, 'ok');
+      assert.strictEqual(callCount, 2);
+      assert.strictEqual(auth.refreshCalled, true);
+    });
+
+    it('should include HTTP status code in REQUEST_ERROR message', async () => {
+      const client = new MCPClient({
+        mcpServerUrl: 'https://example.com',
+        authClient: mockAuthClient(),
+      });
+
+      injectMockSDKClient(client, async () => {
+        const err = new Error('Streamable HTTP error: Error POSTing to endpoint: ');
+        err.code = 500;
+        throw err;
+      });
+
+      const result = await client.callTool('test');
+      assert.strictEqual(result.error.code, 'REQUEST_ERROR');
+      assert.ok(result.error.message.includes('HTTP 500'), `expected HTTP 500 in message, got: ${result.error.message}`);
+    });
   });
 
   describe('listTools', () => {

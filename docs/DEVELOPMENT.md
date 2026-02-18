@@ -74,6 +74,8 @@ All three should return data. If `fdx call` fails with auth errors, run `fdx set
 | `FDX_MCP_SERVER`   | MCP server URL     | `https://mcp.fd.xyz`                   |
 | `FDX_REDIRECT_URI` | OAuth callback URI | `http://localhost:6260/oauth/callback` |
 | `FDX_STORE_PATH`   | Token store path   | `~/.fdx/auth.json`                     |
+| `FDX_LOG_PATH`     | Log file path      | `~/.fdx/fdx.log`                       |
+| `FDX_LOG_LEVEL`    | Log verbosity (`debug`\|`info`\|`warn`\|`error`\|`off`) | `info` |
 
 You can set these inline before a command, as persistent shell exports, or via a `.env` file in the working directory (see `.env.example`). The `.env` file is gitignored so values never end up in the repository.
 

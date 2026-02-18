@@ -131,6 +131,8 @@ console.log(result.data);
 | `FDX_MCP_SERVER`     | MCP server URL     | `https://mcp.fd.xyz`                   |
 | `FDX_REDIRECT_URI`   | OAuth callback URI | `http://localhost:6260/oauth/callback` |
 | `FDX_STORE_PATH`     | Token store path   | `~/.fdx/auth.json`                     |
+| `FDX_LOG_PATH`       | Log file path      | `~/.fdx/fdx.log`                       |
+| `FDX_LOG_LEVEL`      | Log verbosity (`debug`\|`info`\|`warn`\|`error`\|`off`) | `info` |
 
 ## Documentation
 

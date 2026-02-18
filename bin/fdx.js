@@ -22,6 +22,8 @@ program
       `  FDX_MCP_SERVER     MCP server URL (default: https://mcp.fd.xyz)`,
       `  FDX_REDIRECT_URI   OAuth callback URI (default: http://localhost:6260/oauth/callback)`,
       `  FDX_STORE_PATH     Token store path (default: ~/.fdx/auth.json)`,
+      `  FDX_LOG_PATH       Log file path (default: ~/.fdx/fdx.log)`,
+      `  FDX_LOG_LEVEL      Log verbosity: debug|info|warn|error|off (default: info)`,
     ].join('\n'),
   );
 

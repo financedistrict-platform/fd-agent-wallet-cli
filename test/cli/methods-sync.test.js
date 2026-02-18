@@ -19,9 +19,12 @@ describe('CLI method list sync', () => {
     const skip = new Set([
       'constructor',
       'initialize',
+      'initializeForDevice',
       'getAuthorizationUrl',
       'exchangeCodeForToken',
       'getTokenState',
+      'startDeviceFlow',
+      'pollDeviceToken',
       'listTools',
       'close',
     ]);

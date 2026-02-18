@@ -45,7 +45,7 @@ This will:
 - Discover the OAuth server
 - Register a client dynamically (first time only)
 - Print an authorization URL — open it in your browser
-- Wait for the OAuth callback on `localhost:6274`
+- Wait for the OAuth callback on `localhost:6260`
 - Exchange the code for tokens
 - Write tokens to `~/.fdx/auth.json`
 
@@ -72,7 +72,7 @@ All three should return data. If `fdx call` fails with auth errors, run `fdx set
 | Variable           | Description        | Default                                |
 | ------------------ | ------------------ | -------------------------------------- |
 | `FDX_MCP_SERVER`   | MCP server URL     | `https://mcp.fd.xyz`                   |
-| `FDX_REDIRECT_URI` | OAuth callback URI | `http://localhost:6274/oauth/callback` |
+| `FDX_REDIRECT_URI` | OAuth callback URI | `http://localhost:6260/oauth/callback` |
 | `FDX_STORE_PATH`   | Token store path   | `~/.fdx/auth.json`                     |
 
 You can also set these in a `.env` file in the working directory.

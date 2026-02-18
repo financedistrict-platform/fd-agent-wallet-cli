@@ -34,6 +34,47 @@ Check that authentication succeeded:
 fdx status
 ```
 
+## Authentication
+
+FDX uses OAuth 2.1 with [Microsoft Entra External ID](https://learn.microsoft.com/en-us/entra/external-id/). Authentication is always tied to a user identity — the agent acts as a delegate on the user's behalf.
+
+### Interactive flow (default)
+
+```bash
+fdx setup
+```
+
+Opens the authorization URL in your browser. After consent, the browser redirects back to `localhost:6260` and the CLI completes the flow automatically. Requires a browser on the same machine and an available local port.
+
+### Device authorization flow (headless)
+
+```bash
+fdx setup --device
+```
+
+Designed for environments without a browser redirect — Docker containers, CI pipelines, remote servers, and autonomous agents. The CLI retrieves a short one-time code and prints it alongside the verification URL:
+
+```
+──────────────────────────────────────────────────────────
+  Verification URL: https://microsoft.com/devicelogin
+  Enter code:       ABCD-1234
+──────────────────────────────────────────────────────────
+```
+
+Open the URL on any device (or have your agent navigate to it), enter the code, and complete sign-in. The CLI polls in the background and stores the token once authorization is confirmed.
+
+### Token storage
+
+Tokens are stored in the OS credential store where available:
+
+| Platform | Backend |
+|----------|---------|
+| macOS | Keychain (`security` CLI) |
+| Linux | libsecret (`secret-tool` CLI) |
+| Windows | DPAPI (encrypted file in `~/.fdx/`) |
+
+If no credential store is available (e.g. a minimal container), tokens fall back to plaintext in `~/.fdx/auth.json` with a `SecurityWarning` emitted. Tokens are refreshed automatically using the stored refresh token.
+
 ## Usage
 
 Invoke any MCP tool via the CLI:
@@ -74,7 +115,7 @@ console.log(result.data);
 | Environment Variable | Description        | Default                                |
 | -------------------- | ------------------ | -------------------------------------- |
 | `FDX_MCP_SERVER`     | MCP server URL     | `https://mcp.fd.xyz`                   |
-| `FDX_REDIRECT_URI`   | OAuth callback URI | `http://localhost:6274/oauth/callback` |
+| `FDX_REDIRECT_URI`   | OAuth callback URI | `http://localhost:6260/oauth/callback` |
 | `FDX_STORE_PATH`     | Token store path   | `~/.fdx/auth.json`                     |
 
 ## Documentation

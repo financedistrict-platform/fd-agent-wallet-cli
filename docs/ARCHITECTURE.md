@@ -27,7 +27,7 @@ FDX is a three-layer system that gives AI agents secure access to blockchain wal
 │                                                                     │
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │              WalletClient (SDK)                              │  │
-│  │  • OAuth 2.1 + DCR + PKCE authentication                    │  │
+│  │  • OAuth 2.1 + DCR + Device Code authentication                    │  │
 │  │  • JSON-RPC 2.0 MCP protocol client                         │  │
 │  │  • High-level methods for wallet/DeFi operations             │  │
 │  └──────────────────────────────────────────────────────────────┘  │
@@ -63,7 +63,7 @@ The npm package includes:
 
 - **CLI Tool** (`bin/fdx.js`): Command-line interface for setup, status checks, and method invocation
 - **SDK** (`src/wallet-client.js`): High-level JavaScript API with typed methods for each MCP tool
-- **OAuth Client** (`src/mcp-auth.js`): RFC 7591 Dynamic Client Registration with PKCE
+- **OAuth Client** (`src/mcp-auth.js`): RFC 7591 Dynamic Client Registration with Device Authorization Grant (RFC 8628)
 - **MCP Client** (`src/mcp-client.js`): JSON-RPC 2.0 protocol handler with SSE response format
 
 ### 2. Finance District MCP Server
@@ -93,11 +93,12 @@ The remote server (hosted at fd.xyz) provides:
 
 ### First-Time Setup (`fdx setup`)
 
-1. **Generate PKCE challenge**: `S256(random_verifier)` → code_challenge
-2. **Register OAuth client**: POST to `/oauth/register` (RFC 7591 DCR)
-3. **Open browser**: User grants consent via Microsoft Entra ID
-4. **Exchange code**: Authorization code + verifier → access_token + refresh_token
-5. **Store tokens**: Save to `~/.fdx/auth.json`
+1. **Discover OAuth server**: Fetch protected-resource and authorization-server metadata
+2. **Register OAuth client**: POST to `/oauth/register` (RFC 7591 DCR) with device_code grant
+3. **Start device flow**: Request device code from authorization server
+4. **User authenticates**: User opens verification URL and enters code on any device
+5. **Poll for token**: CLI polls token endpoint until user completes authorization
+6. **Store tokens**: Save to `~/.fdx/auth.json` (secrets in OS credential store)
 
 ### Subsequent Requests
 
@@ -111,7 +112,7 @@ No private keys, no seed phrases. All wallet operations are server-side with use
 ## Security Model
 
 - **No Local Keys**: Agent never touches private keys. Wallets are managed server-side.
-- **OAuth 2.1**: Industry-standard authentication with PKCE protection.
+- **OAuth 2.1**: Industry-standard authentication with Device Authorization Grant.
 - **Consent-Based**: User authorizes agent via web browser on first setup.
 - **Token Refresh**: Long-lived refresh tokens minimize re-authentication.
 - **Smart Accounts**: ERC-4337 account abstraction allows multi-signature, recovery, upgradability.

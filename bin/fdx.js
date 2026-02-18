@@ -20,7 +20,6 @@ program
       '',
       `${pc.dim('Environment:')}`,
       `  FDX_MCP_SERVER     MCP server URL (default: https://mcp.fd.xyz)`,
-      `  FDX_REDIRECT_URI   OAuth callback URI (default: http://localhost:6260/oauth/callback)`,
       `  FDX_STORE_PATH     Token store path (default: ~/.fdx/auth.json)`,
       `  FDX_LOG_PATH       Log file path (default: ~/.fdx/fdx.log)`,
       `  FDX_LOG_LEVEL      Log verbosity: debug|info|warn|error|off (default: info)`,
@@ -29,10 +28,9 @@ program
 
 program
   .command('setup')
-  .description('Run OAuth 2.1 authentication flow')
-  .option('--device', 'Use device authorization flow (no browser redirect required)')
-  .action(async (opts) => {
-    await require('./commands/setup')(opts);
+  .description('Run OAuth 2.1 device authorization flow')
+  .action(async () => {
+    await require('./commands/setup')();
   });
 
 program

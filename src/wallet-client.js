@@ -2,14 +2,12 @@ const { MCPAuthClient } = require('./mcp-auth');
 const { MCPClient } = require('./mcp-client');
 
 class WalletClient {
-  constructor({ mcpServerUrl, redirectUri, storePath, httpClient }) {
+  constructor({ mcpServerUrl, storePath, httpClient }) {
     if (!mcpServerUrl) throw new Error('mcpServerUrl is required');
-    if (!redirectUri) throw new Error('redirectUri is required');
     if (!storePath) throw new Error('storePath is required');
 
     this.authClient = new MCPAuthClient({
       mcpServerUrl,
-      redirectUri,
       storePath,
       httpClient,
     });
@@ -24,24 +22,12 @@ class WalletClient {
     return this.authClient.initialize();
   }
 
-  async initializeForDevice() {
-    return this.authClient.initializeForDevice();
-  }
-
-  async getAuthorizationUrl() {
-    return this.authClient.getAuthorizationUrl();
-  }
-
   async startDeviceFlow() {
     return this.authClient.startDeviceFlow();
   }
 
-  async pollDeviceToken({ deviceCode, interval }) {
-    return this.authClient.pollDeviceToken({ deviceCode, interval });
-  }
-
-  async exchangeCodeForToken({ code, state, codeVerifier }) {
-    return this.authClient.exchangeCodeForToken({ code, state, codeVerifier });
+  async pollDeviceToken({ deviceCode, interval, expiresIn }) {
+    return this.authClient.pollDeviceToken({ deviceCode, interval, expiresIn });
   }
 
   async getTokenState() {

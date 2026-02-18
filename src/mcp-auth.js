@@ -1,14 +1,12 @@
-const axios = require('axios');
+﻿const axios = require('axios');
 
 const defaultCredentialStore = require('./credential-store');
 const logger = require('./utils/logger');
 const { readStore, writeStore } = require('./storage');
-const { generateCodeChallenge, generateCodeVerifier, generateState } = require('./utils/pkce');
 
 class MCPAuthClient {
-  constructor({ mcpServerUrl, redirectUri, storePath, httpClient, credentialStore }) {
+  constructor({ mcpServerUrl, storePath, httpClient, credentialStore }) {
     if (!mcpServerUrl) throw new Error('mcpServerUrl is required');
-    if (!redirectUri) throw new Error('redirectUri is required');
     if (!storePath) throw new Error('storePath is required');
 
     const parsed = new URL(mcpServerUrl);
@@ -21,14 +19,11 @@ class MCPAuthClient {
     }
 
     this.mcpServerUrl = mcpServerUrl.replace(/\/$/, '');
-    this.redirectUri = redirectUri;
     this.storePath = storePath;
     this.httpClient = httpClient || axios.create();
     this._credentialStore = credentialStore || defaultCredentialStore;
     this._initialized = false;
     this._initPromise = null;
-    this._deviceInitialized = false;
-    this._deviceInitPromise = null;
     this._discovered = false;
     this._discoveryPromise = null;
   }
@@ -47,61 +42,17 @@ class MCPAuthClient {
   async #doInitialize() {
     await this.#ensureDiscovered();
 
-    const store = await this.#readStore();
-    const cached = store.mcpAuth;
-
-    if (cached?.clientId) {
-      this.clientId = cached.clientId;
-      this._initialized = true;
-      logger.debug('mcp-auth: using cached interactive client', { clientId: this.clientId });
-      return;
+    // Cached discovery metadata may predate device-flow support on the server.
+    // Force a live re-discovery before giving up.
+    if (!this.deviceAuthorizationEndpoint) {
+      this._discovered = false;
+      const store = await this.#readStore();
+      if (store.mcpAuth) {
+        delete store.mcpAuth.oauthServerUrl;
+        await writeStore(store, this.storePath);
+      }
+      await this.#ensureDiscovered();
     }
-
-    // Device-only setup — reuse device client_id for token refresh
-    if (cached?.deviceClientId) {
-      this.clientId = cached.deviceClientId;
-      this._initialized = true;
-      logger.debug('mcp-auth: using cached device client as interactive', { clientId: this.clientId });
-      return;
-    }
-
-    if (this.registrationEndpoint) {
-      const { data: registration } = await this.httpClient.post(
-        this.registrationEndpoint,
-        {
-          redirect_uris: [this.redirectUri],
-          client_name: 'FDX Wallet Client',
-          token_endpoint_auth_method: 'none',
-          grant_types: ['authorization_code', 'refresh_token'],
-          response_types: ['code'],
-          scope: ['openid', 'offline_access', 'api://fd-agent-wallet-mcp/mcp:tools'],
-        },
-        {
-          headers: { 'Content-Type': 'application/json' },
-        },
-      );
-
-      this.clientId = registration.client_id;
-      await this.#persistMCPAuth({ clientId: this.clientId });
-      logger.info('mcp-auth: interactive client registered', { clientId: this.clientId });
-    }
-
-    this._initialized = true;
-  }
-
-  async initializeForDevice() {
-    if (this._deviceInitialized) return;
-    if (this._deviceInitPromise) return this._deviceInitPromise;
-    this._deviceInitPromise = this.#doInitializeDevice();
-    try {
-      await this._deviceInitPromise;
-    } finally {
-      this._deviceInitPromise = null;
-    }
-  }
-
-  async #doInitializeDevice() {
-    await this.#ensureDiscovered();
 
     if (!this.deviceAuthorizationEndpoint) {
       throw new Error('Device authorization flow is not supported by this OAuth server');
@@ -110,10 +61,11 @@ class MCPAuthClient {
     const store = await this.#readStore();
     const cached = store.mcpAuth;
 
-    if (cached?.deviceClientId) {
-      this.deviceClientId = cached.deviceClientId;
-      this._deviceInitialized = true;
-      logger.debug('mcp-auth: using cached device client', { deviceClientId: this.deviceClientId });
+    // Support legacy stores that used deviceClientId
+    if (cached?.clientId || cached?.deviceClientId) {
+      this.clientId = cached.clientId || cached.deviceClientId;
+      this._initialized = true;
+      logger.debug('mcp-auth: using cached client', { clientId: this.clientId });
       return;
     }
 
@@ -131,49 +83,19 @@ class MCPAuthClient {
         },
       );
 
-      this.deviceClientId = registration.client_id;
-      await this.#persistMCPAuth({ deviceClientId: this.deviceClientId });
-      logger.info('mcp-auth: device client registered', { deviceClientId: this.deviceClientId });
+      this.clientId = registration.client_id;
+      await this.#persistMCPAuth({ clientId: this.clientId });
+      logger.info('mcp-auth: client registered', { clientId: this.clientId });
     }
 
-    this._deviceInitialized = true;
-  }
-
-  async getAuthorizationUrl() {
-    await this.initialize();
-
-    const verifier = generateCodeVerifier();
-    const state = generateState();
-    const codeChallenge = await generateCodeChallenge(verifier);
-
-    const url = new URL(this.authorizationEndpoint);
-    url.searchParams.set('response_type', 'code');
-    url.searchParams.set('client_id', this.clientId);
-    url.searchParams.set('redirect_uri', this.redirectUri);
-    url.searchParams.set('code_challenge', codeChallenge);
-    url.searchParams.set('code_challenge_method', 'S256');
-    url.searchParams.set('state', state);
-    url.searchParams.set('scope', 'openid offline_access api://fd-agent-wallet-mcp/mcp:tools');
-    url.searchParams.set('prompt', 'consent');
-    url.searchParams.set('resource', this.mcpServerUrl);
-
-    return {
-      url: url.toString(),
-      state,
-      codeVerifier: verifier,
-      codeChallenge,
-    };
+    this._initialized = true;
   }
 
   async startDeviceFlow() {
-    await this.initializeForDevice();
-
-    if (!this.deviceAuthorizationEndpoint) {
-      throw new Error('Device authorization flow is not supported by this OAuth server');
-    }
+    await this.initialize();
 
     const payload = new URLSearchParams({
-      client_id: this.deviceClientId,
+      client_id: this.clientId,
       scope: 'openid offline_access api://fd-agent-wallet-mcp/mcp:tools',
     });
 
@@ -193,16 +115,21 @@ class MCPAuthClient {
     };
   }
 
-  async pollDeviceToken({ deviceCode, interval = 5 }) {
+  async pollDeviceToken({ deviceCode, interval = 5, expiresIn = 900 }) {
     let pollIntervalMs = interval * 1000;
+    const deadline = Date.now() + expiresIn * 1000;
 
     // eslint-disable-next-line no-constant-condition
     while (true) {
       await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
 
+      if (Date.now() >= deadline) {
+        throw new Error('Device flow code expired \u2014 please run setup again');
+      }
+
       const payload = new URLSearchParams({
         grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-        client_id: this.deviceClientId,
+        client_id: this.clientId,
         device_code: deviceCode,
       });
 
@@ -225,41 +152,12 @@ class MCPAuthClient {
         } else if (error === 'access_denied') {
           throw new Error('Device flow access denied by user');
         } else if (error === 'expired_token') {
-          throw new Error('Device flow code expired — please run setup again');
+          throw new Error('Device flow code expired \u2014 please run setup again');
         } else {
           throw err;
         }
       }
     }
-  }
-
-  async exchangeCodeForToken({ code, state, codeVerifier }) {
-    await this.initialize();
-
-    if (!code) {
-      throw new Error('code is required');
-    }
-    if (!codeVerifier) {
-      throw new Error('codeVerifier is required');
-    }
-    if (!state) {
-      throw new Error('state is required');
-    }
-
-    const payload = new URLSearchParams({
-      grant_type: 'authorization_code',
-      client_id: this.clientId,
-      redirect_uri: this.redirectUri,
-      code,
-      code_verifier: codeVerifier,
-    });
-
-    const { data } = await this.httpClient.post(this.tokenEndpoint, payload.toString(), {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    });
-
-    await this.#persistTokens(data);
-    return data;
   }
 
   async getAccessToken() {
@@ -276,16 +174,16 @@ class MCPAuthClient {
   }
 
   async refreshToken() {
-    // Ensure endpoint discovery is done — read from cache or discover live.
-    // Do NOT call initialize() here: that would trigger interactive DCR for
-    // device-only setups that have never run interactive setup.
     await this.#ensureDiscovered();
 
     // Load client ID from store if not already in memory
-    if (!this.clientId && !this.deviceClientId) {
+    if (!this.clientId) {
       const store = await this.#readStore();
-      this.clientId = store.mcpAuth?.clientId ?? null;
-      this.deviceClientId = store.mcpAuth?.deviceClientId ?? null;
+      this.clientId = store.mcpAuth?.clientId || store.mcpAuth?.deviceClientId || null;
+    }
+
+    if (!this.clientId) {
+      throw new Error('No client ID available \u2014 run setup first');
     }
 
     const tokens = await this.#getTokens();
@@ -298,7 +196,7 @@ class MCPAuthClient {
     const payload = new URLSearchParams({
       grant_type: 'refresh_token',
       refresh_token: tokens.refreshToken,
-      client_id: this.clientId ?? this.deviceClientId,
+      client_id: this.clientId,
     });
 
     const { data } = await this.httpClient.post(this.tokenEndpoint, payload.toString(), {
@@ -325,21 +223,43 @@ class MCPAuthClient {
   }
 
   async logout() {
-    // Remove tokens from OS credential store
     this._credentialStore.deleteSecret(this.#credentialAccount());
 
-    // Clear tokens from the store file but keep mcpAuth (client registrations)
-    // so the next `fdx setup` skips DCR and goes straight to auth
     const store = await this.#readStore();
     delete store.tokens;
     await writeStore(store, this.storePath);
 
-    // Reset in-memory token state
     this._initialized = false;
-    this._deviceInitialized = false;
     this._discovered = false;
 
     logger.info('mcp-auth: logged out', { server: this.mcpServerUrl });
+  }
+
+  #requireHttps(url, label) {
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new Error(`Invalid ${label} URL: ${url}`);
+    }
+    if (
+      parsed.protocol !== 'https:' &&
+      parsed.hostname !== 'localhost' &&
+      parsed.hostname !== '127.0.0.1'
+    ) {
+      throw new Error(`${label} must use HTTPS: ${url}`);
+    }
+  }
+
+  #validateDiscoveredEndpoints() {
+    this.#requireHttps(this.oauthServerUrl, 'authorization_server');
+    this.#requireHttps(this.tokenEndpoint, 'token_endpoint');
+    if (this.registrationEndpoint) {
+      this.#requireHttps(this.registrationEndpoint, 'registration_endpoint');
+    }
+    if (this.deviceAuthorizationEndpoint) {
+      this.#requireHttps(this.deviceAuthorizationEndpoint, 'device_authorization_endpoint');
+    }
   }
 
   #credentialAccount() {
@@ -363,10 +283,10 @@ class MCPAuthClient {
 
     if (cached?.oauthServerUrl && cached?.tokenEndpoint) {
       this.oauthServerUrl = cached.oauthServerUrl;
-      this.authorizationEndpoint = cached.authorizationEndpoint;
       this.tokenEndpoint = cached.tokenEndpoint;
       this.registrationEndpoint = cached.registrationEndpoint;
       this.deviceAuthorizationEndpoint = cached.deviceAuthorizationEndpoint;
+      this.#validateDiscoveredEndpoints();
       this._discovered = true;
       logger.debug('mcp-auth: using cached OAuth discovery', { server: this.oauthServerUrl });
       return;
@@ -375,19 +295,21 @@ class MCPAuthClient {
     const protectedResourceUrl = `${this.mcpServerUrl}/.well-known/oauth-protected-resource`;
     const { data: protectedResource } = await this.httpClient.get(protectedResourceUrl);
 
-    this.oauthServerUrl = protectedResource.authorization_servers[0];
+    const server = protectedResource.authorization_servers?.[0];
+    if (!server) {
+      throw new Error('No authorization server found in protected resource metadata');
+    }
+    this.oauthServerUrl = server;
     logger.info('mcp-auth: OAuth server discovered', { server: this.oauthServerUrl });
-    // RFC 8414 preferred; fall back to OIDC discovery (e.g. Entra External ID only exposes the latter)
     const metadata = await this.#discoverMetadata(this.oauthServerUrl);
 
-    this.authorizationEndpoint = metadata.authorization_endpoint;
     this.tokenEndpoint = metadata.token_endpoint;
     this.registrationEndpoint = metadata.registration_endpoint;
     this.deviceAuthorizationEndpoint = metadata.device_authorization_endpoint;
+    this.#validateDiscoveredEndpoints();
 
     await this.#persistMCPAuth({
       oauthServerUrl: this.oauthServerUrl,
-      authorizationEndpoint: this.authorizationEndpoint,
       tokenEndpoint: this.tokenEndpoint,
       registrationEndpoint: this.registrationEndpoint,
       deviceAuthorizationEndpoint: this.deviceAuthorizationEndpoint,
@@ -397,19 +319,30 @@ class MCPAuthClient {
   }
 
   async #discoverMetadata(oauthServerUrl) {
-    // Try RFC 8414 first; fall back to OIDC discovery (/.well-known/openid-configuration).
-    // Entra External ID only exposes the OIDC document.
     const rfc8414Url = `${oauthServerUrl}/.well-known/oauth-authorization-server`;
+    let rfc8414Data;
     try {
       const { data } = await this.httpClient.get(rfc8414Url);
-      if (data?.token_endpoint) return data;
+      if (data?.token_endpoint) rfc8414Data = data;
     } catch {
-      // not found — try OIDC
+      // not found - try OIDC
+    }
+
+    if (rfc8414Data?.device_authorization_endpoint) {
+      return rfc8414Data;
     }
 
     const oidcUrl = `${oauthServerUrl}/.well-known/openid-configuration`;
-    const { data } = await this.httpClient.get(oidcUrl);
-    return data;
+    try {
+      const { data } = await this.httpClient.get(oidcUrl);
+      if (rfc8414Data) {
+        return { ...data, ...rfc8414Data, device_authorization_endpoint: data.device_authorization_endpoint || rfc8414Data.device_authorization_endpoint };
+      }
+      return data;
+    } catch {
+      if (rfc8414Data) return rfc8414Data;
+      throw new Error(`OAuth metadata discovery failed for ${oauthServerUrl}`);
+    }
   }
 
   async #getTokens() {
@@ -425,12 +358,11 @@ class MCPAuthClient {
           return { ...tokens, ...secrets };
         }
       } catch {
-        // Credential store read failed — return metadata only
+        // Credential store read failed - return metadata only
       }
       return tokens;
     }
 
-    // Legacy: tokens are stored inline in the file
     return tokens;
   }
 

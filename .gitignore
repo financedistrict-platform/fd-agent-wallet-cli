@@ -1,0 +1,9 @@
+node_modules/
+coverage/
+.env
+.env.*
+!.env.example
+.npmrc
+.DS_Store
+npm-debug.log*
+*.log

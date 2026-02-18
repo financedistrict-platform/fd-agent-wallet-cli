@@ -269,7 +269,17 @@ class MCPAuthClient {
   }
 
   async refreshToken() {
-    await this.initialize();
+    // Ensure endpoint discovery is done — read from cache or discover live.
+    // Do NOT call initialize() here: that would trigger interactive DCR for
+    // device-only setups that have never run interactive setup.
+    await this.#ensureDiscovered();
+
+    // Load client ID from store if not already in memory
+    if (!this.clientId && !this.deviceClientId) {
+      const store = await this.#readStore();
+      this.clientId = store.mcpAuth?.clientId ?? null;
+      this.deviceClientId = store.mcpAuth?.deviceClientId ?? null;
+    }
 
     const tokens = await this.#getTokens();
     if (!tokens?.refreshToken) {

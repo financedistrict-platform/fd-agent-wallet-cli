@@ -52,6 +52,7 @@ function createInitializedClient(tmpDir, credStore) {
   client.tokenEndpoint = 'https://auth.example.com/token';
   client.clientId = 'test-client-id';
   client._initialized = true;
+  client._discovered = true;
 
   return { client, storePath };
 }
@@ -251,6 +252,42 @@ describe('MCPAuthClient - Credential Store Integration', () => {
     const secret = JSON.parse(credStore._secrets['mcp.test.example.com']);
     assert.strictEqual(secret.accessToken, 'new-access');
     assert.strictEqual(secret.refreshToken, 'original-refresh');
+  });
+
+  it('should refresh using deviceClientId without triggering interactive DCR', async () => {
+    // Simulates a device-only setup: no clientId, only deviceClientId in store
+    let postCount = 0;
+    const credStore = mockCredentialStore(true);
+    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
+      post: async (_url, body) => {
+        postCount++;
+        // Should only be called once — for the refresh grant, not for DCR
+        const params = new URLSearchParams(body);
+        assert.strictEqual(params.get('grant_type'), 'refresh_token', 'only refresh_token grant expected');
+        return { data: { access_token: 'new-device-at', token_type: 'Bearer', expires_in: 3600 } };
+      },
+    }));
+
+    // Set up in-memory state as if initializeForDevice() ran
+    client.oauthServerUrl = 'https://auth.example.com';
+    client.tokenEndpoint = 'https://auth.example.com/token';
+    client.deviceClientId = 'device-client-id';
+    client._deviceInitialized = true;
+    client._discovered = true;
+
+    // Seed refresh token in credential store
+    credStore._secrets['mcp.test.example.com'] = JSON.stringify({
+      accessToken: 'old-at',
+      refreshToken: 'device-refresh-token',
+    });
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({ mcpAuth: { deviceClientId: 'device-client-id' }, tokens: { credentialStore: true } }),
+    );
+
+    const newToken = await client.refreshToken();
+    assert.strictEqual(newToken, 'new-device-at');
+    assert.strictEqual(postCount, 1, 'only one POST — no DCR registration');
   });
 
   describe('getTokenState', () => {

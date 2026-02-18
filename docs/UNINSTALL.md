@@ -11,7 +11,7 @@ Remove FDX and all associated data.
 rm -rf ~/.fdx
 
 # 2. Uninstall the package globally
-npm uninstall -g @1stdigital/fdx
+npm uninstall -g @financedistrict/fdx
 ```
 
 ### For development users (git clone)
@@ -23,7 +23,7 @@ If you installed from source:
 rm -rf ~/.fdx
 
 # 2. Unlink the CLI
-npm unlink -g @1stdigital/fdx
+npm unlink -g @financedistrict/fdx
 
 # 3. Remove the repo
 rm -rf fd-agent-wallet-cli  # or wherever you cloned it

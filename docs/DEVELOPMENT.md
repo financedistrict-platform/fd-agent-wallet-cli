@@ -15,7 +15,7 @@ Step-by-step instructions to set up FDX for local development on any machine.
 ## 1. Clone the repo
 
 ```bash
-git clone https://github.com/1stdigital/fd-agent-wallet-cli.git
+git clone https://github.com/financedistrict/fd-agent-wallet-cli.git
 cd fd-agent-wallet-cli
 ```
 

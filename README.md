@@ -1,7 +1,7 @@
 # FDX — Agent Wallet CLI
 
-[![npm version](https://img.shields.io/npm/v/@1stdigital/fdx)](https://www.npmjs.com/package/@1stdigital/fdx)
-[![CI](https://github.com/1stdigital/fd-agent-wallet-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/1stdigital/fd-agent-wallet-cli/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/@financedistrict/fdx)](https://www.npmjs.com/package/@financedistrict/fdx)
+[![CI](https://github.com/financedistrict/fd-agent-wallet-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/financedistrict/fd-agent-wallet-cli/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A command-line interface to the [Finance District](https://fd.xyz) MCP wallet server. Gives AI agents crypto wallet capabilities — hold, send, swap, and earn yield on assets across multiple chains — without managing private keys.
@@ -19,7 +19,7 @@ FDX is designed for AI agents and agent frameworks that need wallet tooling but 
 ## Quick Start
 
 ```bash
-npm install -g @1stdigital/fdx
+npm install -g @financedistrict/fdx
 ```
 
 Run the setup (opens browser for OAuth):
@@ -117,7 +117,7 @@ Run `fdx call` without arguments to see all available methods.
 FDX can also be used as a Node.js library:
 
 ```js
-const { createClientFromEnv } = require('@1stdigital/fdx');
+const { createClientFromEnv } = require('@financedistrict/fdx');
 
 const client = createClientFromEnv();
 const result = await client.getWalletOverview({ chainKey: 'ethereum' });
@@ -146,8 +146,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/1stdigital/fd-agent-wallet-cli/issues)
-- **Source**: [GitHub Repository](https://github.com/1stdigital/fd-agent-wallet-cli)
+- **Issues**: [GitHub Issues](https://github.com/financedistrict/fd-agent-wallet-cli/issues)
+- **Source**: [GitHub Repository](https://github.com/financedistrict/fd-agent-wallet-cli)
 
 ## License
 

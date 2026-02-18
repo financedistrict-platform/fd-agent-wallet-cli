@@ -14,7 +14,7 @@ FDX is a three-layer system that gives AI agents secure access to blockchain wal
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                       FDX npm Package                               │
-│                       (@1stdigital/fdx)                             │
+│                   (@financedistrict/fdx)                   │
 │                                                                     │
 │  ┌─────────────────┐                                               │
 │  │  CLI Commands   │                                               │
@@ -57,7 +57,7 @@ FDX is a three-layer system that gives AI agents secure access to blockchain wal
 
 ## Key Components
 
-### 1. npm Package (`@1stdigital/fdx`)
+### 1. npm Package (`@financedistrict/fdx`)
 
 The npm package includes:
 

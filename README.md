@@ -34,6 +34,12 @@ Check that authentication succeeded:
 fdx status
 ```
 
+To remove stored credentials:
+
+```bash
+fdx logout
+```
+
 ## Authentication
 
 FDX uses OAuth 2.1 with [Microsoft Entra External ID](https://learn.microsoft.com/en-us/entra/external-id/). Authentication is always tied to a user identity — the agent acts as a delegate on the user's behalf.
@@ -74,6 +80,14 @@ Tokens are stored in the OS credential store where available:
 | Windows | DPAPI (encrypted file in `~/.fdx/`) |
 
 If no credential store is available (e.g. a minimal container), tokens fall back to plaintext in `~/.fdx/auth.json` with a `SecurityWarning` emitted. Tokens are refreshed automatically using the stored refresh token.
+
+### Logging out
+
+```bash
+fdx logout
+```
+
+Removes the stored access and refresh tokens from the OS credential store and clears them from `~/.fdx/auth.json`. Client registrations (DCR) are preserved so the next `fdx setup` skips re-registration and goes straight to authentication.
 
 ## Usage
 
@@ -117,6 +131,8 @@ console.log(result.data);
 | `FDX_MCP_SERVER`     | MCP server URL     | `https://mcp.fd.xyz`                   |
 | `FDX_REDIRECT_URI`   | OAuth callback URI | `http://localhost:6260/oauth/callback` |
 | `FDX_STORE_PATH`     | Token store path   | `~/.fdx/auth.json`                     |
+| `FDX_LOG_PATH`       | Log file path      | `~/.fdx/fdx.log`                       |
+| `FDX_LOG_LEVEL`      | Log verbosity (`debug`\|`info`\|`warn`\|`error`\|`off`) | `info` |
 
 ## Documentation
 

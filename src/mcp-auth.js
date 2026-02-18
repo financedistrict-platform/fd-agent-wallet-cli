@@ -1,6 +1,7 @@
 const axios = require('axios');
 
 const defaultCredentialStore = require('./credential-store');
+const logger = require('./utils/logger');
 const { readStore, writeStore } = require('./storage');
 const { generateCodeChallenge, generateCodeVerifier, generateState } = require('./utils/pkce');
 
@@ -52,6 +53,7 @@ class MCPAuthClient {
     if (cached?.clientId) {
       this.clientId = cached.clientId;
       this._initialized = true;
+      logger.debug('mcp-auth: using cached interactive client', { clientId: this.clientId });
       return;
     }
 
@@ -59,6 +61,7 @@ class MCPAuthClient {
     if (cached?.deviceClientId) {
       this.clientId = cached.deviceClientId;
       this._initialized = true;
+      logger.debug('mcp-auth: using cached device client as interactive', { clientId: this.clientId });
       return;
     }
 
@@ -80,6 +83,7 @@ class MCPAuthClient {
 
       this.clientId = registration.client_id;
       await this.#persistMCPAuth({ clientId: this.clientId });
+      logger.info('mcp-auth: interactive client registered', { clientId: this.clientId });
     }
 
     this._initialized = true;
@@ -109,6 +113,7 @@ class MCPAuthClient {
     if (cached?.deviceClientId) {
       this.deviceClientId = cached.deviceClientId;
       this._deviceInitialized = true;
+      logger.debug('mcp-auth: using cached device client', { deviceClientId: this.deviceClientId });
       return;
     }
 
@@ -128,6 +133,7 @@ class MCPAuthClient {
 
       this.deviceClientId = registration.client_id;
       await this.#persistMCPAuth({ deviceClientId: this.deviceClientId });
+      logger.info('mcp-auth: device client registered', { deviceClientId: this.deviceClientId });
     }
 
     this._deviceInitialized = true;
@@ -206,6 +212,7 @@ class MCPAuthClient {
         });
 
         await this.#persistTokens(data);
+        logger.info('mcp-auth: token obtained via device flow', { server: this.mcpServerUrl });
         return data;
       } catch (err) {
         const error = err.response?.data?.error;
@@ -269,12 +276,24 @@ class MCPAuthClient {
   }
 
   async refreshToken() {
-    await this.initialize();
+    // Ensure endpoint discovery is done — read from cache or discover live.
+    // Do NOT call initialize() here: that would trigger interactive DCR for
+    // device-only setups that have never run interactive setup.
+    await this.#ensureDiscovered();
+
+    // Load client ID from store if not already in memory
+    if (!this.clientId && !this.deviceClientId) {
+      const store = await this.#readStore();
+      this.clientId = store.mcpAuth?.clientId ?? null;
+      this.deviceClientId = store.mcpAuth?.deviceClientId ?? null;
+    }
 
     const tokens = await this.#getTokens();
     if (!tokens?.refreshToken) {
       throw new Error('No refresh token available');
     }
+
+    logger.debug('mcp-auth: refreshing access token', { server: this.mcpServerUrl });
 
     const payload = new URLSearchParams({
       grant_type: 'refresh_token',
@@ -287,6 +306,7 @@ class MCPAuthClient {
     });
 
     await this.#persistTokens({ ...tokens, ...data });
+    logger.info('mcp-auth: access token refreshed', { server: this.mcpServerUrl });
     return data.access_token;
   }
 
@@ -302,6 +322,24 @@ class MCPAuthClient {
       clientId: store.mcpAuth?.clientId || store.mcpAuth?.deviceClientId,
       usingCredentialStore: !!store.tokens?.credentialStore,
     };
+  }
+
+  async logout() {
+    // Remove tokens from OS credential store
+    this._credentialStore.deleteSecret(this.#credentialAccount());
+
+    // Clear tokens from the store file but keep mcpAuth (client registrations)
+    // so the next `fdx setup` skips DCR and goes straight to auth
+    const store = await this.#readStore();
+    delete store.tokens;
+    await writeStore(store, this.storePath);
+
+    // Reset in-memory token state
+    this._initialized = false;
+    this._deviceInitialized = false;
+    this._discovered = false;
+
+    logger.info('mcp-auth: logged out', { server: this.mcpServerUrl });
   }
 
   #credentialAccount() {
@@ -330,6 +368,7 @@ class MCPAuthClient {
       this.registrationEndpoint = cached.registrationEndpoint;
       this.deviceAuthorizationEndpoint = cached.deviceAuthorizationEndpoint;
       this._discovered = true;
+      logger.debug('mcp-auth: using cached OAuth discovery', { server: this.oauthServerUrl });
       return;
     }
 
@@ -337,8 +376,7 @@ class MCPAuthClient {
     const { data: protectedResource } = await this.httpClient.get(protectedResourceUrl);
 
     this.oauthServerUrl = protectedResource.authorization_servers[0];
-    // eslint-disable-next-line no-console
-    console.log(`OAuth server: ${new URL(this.oauthServerUrl).host}`);
+    logger.info('mcp-auth: OAuth server discovered', { server: this.oauthServerUrl });
     // RFC 8414 preferred; fall back to OIDC discovery (e.g. Entra External ID only exposes the latter)
     const metadata = await this.#discoverMetadata(this.oauthServerUrl);
 

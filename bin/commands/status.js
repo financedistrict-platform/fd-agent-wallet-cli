@@ -5,18 +5,21 @@ const { createClientFromEnv } = require('../../src');
 module.exports = async function status() {
   const client = createClientFromEnv();
   const storePath = client.authClient.storePath;
+  const mcpServer = client.authClient.mcpServerUrl;
 
   let state;
   try {
     state = await client.getTokenState();
   } catch (error) {
     console.log(pc.red('Status: not configured'));
+    console.log(`  ${pc.dim('MCP server:')}  ${mcpServer}`);
     console.log(`  ${pc.dim('Store path:')} ${storePath} (${error.message})`);
     process.exit(1);
   }
 
   if (!state.authenticated) {
     console.log(pc.yellow('Status: not authenticated'));
+    console.log(`  ${pc.dim('MCP server:')}  ${mcpServer}`);
     console.log(`  ${pc.dim('Store path:')} ${storePath}`);
     console.log(`  Run ${pc.cyan('"fdx setup"')} to authenticate.`);
     process.exit(1);
@@ -24,6 +27,7 @@ module.exports = async function status() {
 
   const statusLabel = state.expired ? pc.yellow('token expired') : pc.green('authenticated');
   console.log(`Status: ${statusLabel}`);
+  console.log(`  ${pc.dim('MCP server:')}    ${mcpServer}`);
   console.log(`  ${pc.dim('Store path:')}    ${storePath}`);
   console.log(`  ${pc.dim('Client ID:')}     ${state.clientId || 'unknown'}`);
   console.log(

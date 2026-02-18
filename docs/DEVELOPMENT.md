@@ -74,8 +74,39 @@ All three should return data. If `fdx call` fails with auth errors, run `fdx set
 | `FDX_MCP_SERVER`   | MCP server URL     | `https://mcp.fd.xyz`                   |
 | `FDX_REDIRECT_URI` | OAuth callback URI | `http://localhost:6260/oauth/callback` |
 | `FDX_STORE_PATH`   | Token store path   | `~/.fdx/auth.json`                     |
+| `FDX_LOG_PATH`     | Log file path      | `~/.fdx/fdx.log`                       |
+| `FDX_LOG_LEVEL`    | Log verbosity (`debug`\|`info`\|`warn`\|`error`\|`off`) | `info` |
 
-You can also set these in a `.env` file in the working directory.
+You can set these inline before a command, as persistent shell exports, or via a `.env` file in the working directory (see `.env.example`). The `.env` file is gitignored so values never end up in the repository.
+
+## 6. Testing against a non-production environment
+
+The CLI defaults to the production server. To point it at a different environment, override `FDX_MCP_SERVER` — the test server address is shared privately with the test team and must never be committed to the repository.
+
+**Option A — inline (one command):**
+
+```bash
+FDX_MCP_SERVER=https://... fdx setup --device
+FDX_MCP_SERVER=https://... fdx call getMyInfo
+```
+
+**Option B — shell export (current session):**
+
+```bash
+export FDX_MCP_SERVER=https://...
+fdx setup --device
+fdx call getMyInfo
+```
+
+**Option C — `.env` file (persistent, local only):**
+
+```bash
+cp .env.example .env
+# edit .env and uncomment FDX_MCP_SERVER=https://...
+fdx setup --device
+```
+
+The `.env` file is loaded automatically when the `fdx` binary starts. It is gitignored — do not commit it.
 
 ---
 

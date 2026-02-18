@@ -3,6 +3,8 @@ const {
   StreamableHTTPClientTransport,
 } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
 
+const logger = require('./utils/logger');
+
 const CLIENT_NAME = 'fdx';
 const CLIENT_VERSION = require('../package.json').version;
 
@@ -38,6 +40,8 @@ class MCPClient {
   async callTool(toolName, args, retried = false) {
     if (!toolName) throw new Error('toolName is required');
 
+    logger.debug('mcp: calling tool', { tool: toolName, args });
+
     try {
       if (!this._client) await this.connect();
 
@@ -48,28 +52,34 @@ class MCPClient {
 
       if (result.isError) {
         const message = result.content?.[0]?.text || 'Tool returned an error';
+        logger.warn('mcp: tool returned error', { tool: toolName, message });
         return { error: { code: 'TOOL_ERROR', message } };
       }
 
       for (const item of result.content || []) {
         if (item.type === 'text' && item.text) {
           try {
+            logger.info('mcp: tool call succeeded', { tool: toolName });
             return { data: JSON.parse(item.text) };
           } catch {
+            logger.info('mcp: tool call succeeded', { tool: toolName });
             return { data: item.text };
           }
         }
       }
 
+      logger.info('mcp: tool call succeeded', { tool: toolName });
       return { data: result.content };
     } catch (error) {
       // Handle auth failures — reconnect with refreshed token once
       if (!retried && isAuthError(error)) {
+        logger.warn('mcp: 401 on tool call, retrying after token refresh', { tool: toolName });
         try {
           await this.close();
           await this.authClient.refreshToken();
           return this.callTool(toolName, args, true);
         } catch (refreshError) {
+          logger.error('mcp: token refresh failed during tool call', { tool: toolName, error: refreshError.message });
           return {
             error: {
               code: 'AUTH_REFRESH_FAILED',
@@ -81,6 +91,7 @@ class MCPClient {
 
       // Auth error that we already retried, or getAccessToken failed initially
       if (isAuthError(error)) {
+        logger.error('mcp: authentication failed', { tool: toolName, error: error.message });
         return {
           error: {
             code: 'AUTH_ERROR',
@@ -89,10 +100,12 @@ class MCPClient {
         };
       }
 
+      const statusSuffix = error?.code > 0 ? ` (HTTP ${error.code})` : '';
+      logger.error('mcp: tool call failed', { tool: toolName, code: error?.code, error: error.message });
       return {
         error: {
           code: 'REQUEST_ERROR',
-          message: error.message,
+          message: `${error.message}${statusSuffix}`,
         },
       };
     }
@@ -127,6 +140,7 @@ class MCPClient {
 function isAuthError(error) {
   const msg = error?.message?.toLowerCase() || '';
   return (
+    error?.code === 401 || // StreamableHTTPError stores status in .code
     error?.httpStatusCode === 401 ||
     msg.includes('unauthorized') ||
     msg.includes('401') ||

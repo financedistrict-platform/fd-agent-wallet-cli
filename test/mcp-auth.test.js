@@ -181,7 +181,54 @@ describe('MCPAuthClient - Credential Store Integration', () => {
       }),
     );
 
-    await assert.rejects(() => client.getAccessToken(), /No access token available/);
+    await assert.rejects(() => client.getAccessToken(), /credential store is unavailable/);
+  });
+
+  it('should throw when credential store read fails after setup', async () => {
+    const credStore = mockCredentialStore(true);
+    const { client, storePath } = createInitializedClient(tmpDir, credStore);
+
+    // Simulate: setup stored tokens in credential store, then keyring becomes unavailable
+    credStore.getSecret = () => null;
+
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({
+        tokens: {
+          credentialStore: true,
+          expiresAt: Date.now() + 3600000,
+          tokenType: 'Bearer',
+        },
+      }),
+    );
+
+    await assert.rejects(
+      () => client.getAccessToken(),
+      /credential store is unavailable/,
+    );
+  });
+
+  it('should throw when credential store throws during read', async () => {
+    const credStore = mockCredentialStore(true);
+    const { client, storePath } = createInitializedClient(tmpDir, credStore);
+
+    credStore.getSecret = () => { throw new Error('dbus connection failed'); };
+
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({
+        tokens: {
+          credentialStore: true,
+          expiresAt: Date.now() + 3600000,
+          tokenType: 'Bearer',
+        },
+      }),
+    );
+
+    await assert.rejects(
+      () => client.getAccessToken(),
+      /credential store is unavailable/,
+    );
   });
 
   it('should preserve refresh token during token refresh', async () => {
@@ -338,6 +385,30 @@ describe('MCPAuthClient - Credential Store Integration', () => {
       const state = await client.getTokenState();
       assert.strictEqual(state.authenticated, false);
       assert.strictEqual(state.usingCredentialStore, false);
+    });
+
+    it('should return not-authenticated when credential store is unavailable', async () => {
+      const credStore = mockCredentialStore(true);
+      const { client, storePath } = createInitializedClient(tmpDir, credStore);
+
+      // Simulate keyring locked / dbus unavailable
+      credStore.getSecret = () => null;
+
+      await fs.writeFile(
+        storePath,
+        JSON.stringify({
+          tokens: {
+            credentialStore: true,
+            expiresAt: Date.now() + 3600000,
+          },
+          mcpAuth: { clientId: 'my-client' },
+        }),
+      );
+
+      const state = await client.getTokenState();
+      assert.strictEqual(state.authenticated, false);
+      assert.strictEqual(state.usingCredentialStore, true);
+      assert.strictEqual(state.clientId, 'my-client');
     });
 
     it('should report expired tokens', async () => {

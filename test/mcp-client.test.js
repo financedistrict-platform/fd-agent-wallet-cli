@@ -207,6 +207,34 @@ describe('MCPClient', () => {
       assert.strictEqual(result.error.code, 'AUTH_REFRESH_FAILED');
     });
 
+    it('should return REQUEST_ERROR when local token is missing (not retryable)', async () => {
+      const client = new MCPClient({
+        mcpServerUrl: 'https://example.com',
+        authClient: {
+          getAccessToken: async () => { throw new Error('No access token available'); },
+          refreshToken: async () => { throw new Error('should not be called'); },
+        },
+      });
+
+      const result = await client.callTool('test');
+      assert.strictEqual(result.error.code, 'REQUEST_ERROR');
+      assert.ok(result.error.message.includes('No access token'));
+    });
+
+    it('should return REQUEST_ERROR when credential store is unavailable (not retryable)', async () => {
+      const client = new MCPClient({
+        mcpServerUrl: 'https://example.com',
+        authClient: {
+          getAccessToken: async () => { throw new Error('OS credential store is unavailable'); },
+          refreshToken: async () => { throw new Error('should not be called'); },
+        },
+      });
+
+      const result = await client.callTool('test');
+      assert.strictEqual(result.error.code, 'REQUEST_ERROR');
+      assert.ok(result.error.message.includes('credential store'));
+    });
+
     it('should return REQUEST_ERROR for non-auth errors', async () => {
       const client = new MCPClient({
         mcpServerUrl: 'https://example.com',

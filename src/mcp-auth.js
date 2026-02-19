@@ -210,7 +210,12 @@ class MCPAuthClient {
 
   async getTokenState() {
     const store = await this.#readStore();
-    const tokens = await this.#getTokens();
+    let tokens = null;
+    try {
+      tokens = await this.#getTokens();
+    } catch {
+      // Credential store unavailable — report as not authenticated
+    }
 
     return {
       authenticated: !!tokens?.accessToken,
@@ -358,9 +363,11 @@ class MCPAuthClient {
           return { ...tokens, ...secrets };
         }
       } catch {
-        // Credential store read failed - return metadata only
+        // Credential store read threw — fall through to error below
       }
-      return tokens;
+      throw new Error(
+        'OS credential store is unavailable \u2014 re-run "fdx setup" to re-authenticate',
+      );
     }
 
     return tokens;

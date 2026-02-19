@@ -1,7 +1,9 @@
 'use strict';
 
 const { execFileSync } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const SERVICE = 'fdx-wallet';
@@ -166,8 +168,6 @@ function deleteSecret(account) {
 // and stored in a file under ~/.fdx/
 
 function dpapiPath(account) {
-  const crypto = require('crypto');
-  const os = require('os');
   const hash = crypto.createHash('sha256').update(account).digest('hex').slice(0, 16);
   return path.join(os.homedir(), '.fdx', `.cred_${hash}`);
 }

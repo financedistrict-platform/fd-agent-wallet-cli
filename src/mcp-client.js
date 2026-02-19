@@ -143,8 +143,7 @@ function isAuthError(error) {
     error?.code === 401 || // StreamableHTTPError stores status in .code
     error?.httpStatusCode === 401 ||
     msg.includes('unauthorized') ||
-    msg.includes('401') ||
-    msg.includes('no access token')
+    msg.includes('401')
   );
 }
 

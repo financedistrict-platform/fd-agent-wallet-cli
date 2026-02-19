@@ -34,7 +34,6 @@ function createClient(tmpDir, credStore, httpClient) {
   const storePath = path.join(tmpDir, 'auth.json');
   const client = new MCPAuthClient({
     mcpServerUrl: 'https://mcp.test.example.com',
-    redirectUri: 'http://localhost:6260/oauth/callback',
     storePath,
     httpClient: httpClient || mockHttpClient(),
     credentialStore: credStore,
@@ -46,26 +45,12 @@ function createClient(tmpDir, credStore, httpClient) {
 function createInitializedClient(tmpDir, credStore) {
   const { client, storePath } = createClient(tmpDir, credStore);
 
-  // Set fields that would normally be populated by initialize()
   client.oauthServerUrl = 'https://auth.example.com';
-  client.authorizationEndpoint = 'https://auth.example.com/authorize';
   client.tokenEndpoint = 'https://auth.example.com/token';
+  client.deviceAuthorizationEndpoint = 'https://auth.example.com/devicecode';
   client.clientId = 'test-client-id';
   client._initialized = true;
   client._discovered = true;
-
-  return { client, storePath };
-}
-
-function createDeviceClient(tmpDir, credStore) {
-  const { client, storePath } = createClient(tmpDir, credStore);
-
-  client.oauthServerUrl = 'https://auth.example.com';
-  client.authorizationEndpoint = 'https://auth.example.com/authorize';
-  client.tokenEndpoint = 'https://auth.example.com/token';
-  client.deviceAuthorizationEndpoint = 'https://auth.example.com/devicecode';
-  client.deviceClientId = 'test-device-client-id';
-  client._deviceInitialized = true;
 
   return { client, storePath };
 }
@@ -95,18 +80,12 @@ describe('MCPAuthClient - Credential Store Integration', () => {
       },
     });
 
-    await client.exchangeCodeForToken({
-      code: 'auth-code',
-      state: 'test-state',
-      codeVerifier: 'test-verifier',
-    });
+    await client.pollDeviceToken({ deviceCode: 'test-device-code', interval: 0 });
 
-    // Credential store should have the tokens
     const secret = JSON.parse(credStore._secrets['mcp.test.example.com']);
     assert.strictEqual(secret.accessToken, 'access-123');
     assert.strictEqual(secret.refreshToken, 'refresh-456');
 
-    // File should NOT have plaintext tokens
     const file = JSON.parse(await fs.readFile(storePath, 'utf8'));
     assert.strictEqual(file.tokens.accessToken, undefined);
     assert.strictEqual(file.tokens.refreshToken, undefined);
@@ -118,7 +97,6 @@ describe('MCPAuthClient - Credential Store Integration', () => {
     const credStore = mockCredentialStore(false);
     const { client, storePath } = createInitializedClient(tmpDir, credStore);
 
-    // Suppress the SecurityWarning during tests
     const warnings = [];
     const handler = (w) => warnings.push(w);
     process.on('warning', handler);
@@ -132,21 +110,15 @@ describe('MCPAuthClient - Credential Store Integration', () => {
       },
     });
 
-    await client.exchangeCodeForToken({
-      code: 'auth-code',
-      state: 'test-state',
-      codeVerifier: 'test-verifier',
-    });
+    await client.pollDeviceToken({ deviceCode: 'test-device-code', interval: 0 });
 
     process.removeListener('warning', handler);
 
-    // File should have plaintext tokens
     const file = JSON.parse(await fs.readFile(storePath, 'utf8'));
     assert.strictEqual(file.tokens.accessToken, 'access-plain');
     assert.strictEqual(file.tokens.refreshToken, 'refresh-plain');
     assert.strictEqual(file.tokens.credentialStore, undefined);
 
-    // Warning should have been emitted
     assert.ok(warnings.length > 0);
     assert.ok(warnings[0].message.includes('plaintext'));
   });
@@ -155,7 +127,6 @@ describe('MCPAuthClient - Credential Store Integration', () => {
     const credStore = mockCredentialStore(true);
     const { client, storePath } = createInitializedClient(tmpDir, credStore);
 
-    // Pre-populate credential store and file
     credStore._secrets['mcp.test.example.com'] = JSON.stringify({
       accessToken: 'keychain-access',
       refreshToken: 'keychain-refresh',
@@ -180,7 +151,6 @@ describe('MCPAuthClient - Credential Store Integration', () => {
     const credStore = mockCredentialStore(true);
     const { client, storePath } = createInitializedClient(tmpDir, credStore);
 
-    // File has inline tokens (old format)
     await fs.writeFile(
       storePath,
       JSON.stringify({
@@ -201,7 +171,6 @@ describe('MCPAuthClient - Credential Store Integration', () => {
     const credStore = mockCredentialStore(true);
     const { client, storePath } = createInitializedClient(tmpDir, credStore);
 
-    // File says credentialStore: true but store is empty
     await fs.writeFile(
       storePath,
       JSON.stringify({
@@ -212,14 +181,60 @@ describe('MCPAuthClient - Credential Store Integration', () => {
       }),
     );
 
-    await assert.rejects(() => client.getAccessToken(), /No access token available/);
+    await assert.rejects(() => client.getAccessToken(), /credential store is unavailable/);
+  });
+
+  it('should throw when credential store read fails after setup', async () => {
+    const credStore = mockCredentialStore(true);
+    const { client, storePath } = createInitializedClient(tmpDir, credStore);
+
+    // Simulate: setup stored tokens in credential store, then keyring becomes unavailable
+    credStore.getSecret = () => null;
+
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({
+        tokens: {
+          credentialStore: true,
+          expiresAt: Date.now() + 3600000,
+          tokenType: 'Bearer',
+        },
+      }),
+    );
+
+    await assert.rejects(
+      () => client.getAccessToken(),
+      /credential store is unavailable/,
+    );
+  });
+
+  it('should throw when credential store throws during read', async () => {
+    const credStore = mockCredentialStore(true);
+    const { client, storePath } = createInitializedClient(tmpDir, credStore);
+
+    credStore.getSecret = () => { throw new Error('dbus connection failed'); };
+
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({
+        tokens: {
+          credentialStore: true,
+          expiresAt: Date.now() + 3600000,
+          tokenType: 'Bearer',
+        },
+      }),
+    );
+
+    await assert.rejects(
+      () => client.getAccessToken(),
+      /credential store is unavailable/,
+    );
   });
 
   it('should preserve refresh token during token refresh', async () => {
     const credStore = mockCredentialStore(true);
     const { client, storePath } = createInitializedClient(tmpDir, credStore);
 
-    // Pre-populate with existing tokens
     credStore._secrets['mcp.test.example.com'] = JSON.stringify({
       accessToken: 'old-access',
       refreshToken: 'original-refresh',
@@ -230,13 +245,12 @@ describe('MCPAuthClient - Credential Store Integration', () => {
       JSON.stringify({
         tokens: {
           credentialStore: true,
-          expiresAt: Date.now() - 60000, // expired
+          expiresAt: Date.now() - 60000,
           tokenType: 'Bearer',
         },
       }),
     );
 
-    // Token endpoint returns new access token but no new refresh token
     client.httpClient.post = async () => ({
       data: {
         access_token: 'new-access',
@@ -248,34 +262,59 @@ describe('MCPAuthClient - Credential Store Integration', () => {
     const newToken = await client.refreshToken();
     assert.strictEqual(newToken, 'new-access');
 
-    // Refresh token should be preserved
     const secret = JSON.parse(credStore._secrets['mcp.test.example.com']);
     assert.strictEqual(secret.accessToken, 'new-access');
     assert.strictEqual(secret.refreshToken, 'original-refresh');
   });
 
-  it('should refresh using deviceClientId without triggering interactive DCR', async () => {
-    // Simulates a device-only setup: no clientId, only deviceClientId in store
+  it('should refresh using clientId from store', async () => {
     let postCount = 0;
     const credStore = mockCredentialStore(true);
     const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
       post: async (_url, body) => {
         postCount++;
-        // Should only be called once — for the refresh grant, not for DCR
         const params = new URLSearchParams(body);
         assert.strictEqual(params.get('grant_type'), 'refresh_token', 'only refresh_token grant expected');
+        return { data: { access_token: 'new-at', token_type: 'Bearer', expires_in: 3600 } };
+      },
+    }));
+
+    client.oauthServerUrl = 'https://auth.example.com';
+    client.tokenEndpoint = 'https://auth.example.com/token';
+    client.clientId = 'my-client-id';
+    client._initialized = true;
+    client._discovered = true;
+
+    credStore._secrets['mcp.test.example.com'] = JSON.stringify({
+      accessToken: 'old-at',
+      refreshToken: 'my-refresh-token',
+    });
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({ mcpAuth: { clientId: 'my-client-id' }, tokens: { credentialStore: true } }),
+    );
+
+    const newToken = await client.refreshToken();
+    assert.strictEqual(newToken, 'new-at');
+    assert.strictEqual(postCount, 1, 'only one POST');
+  });
+
+  it('should refresh using legacy deviceClientId from store', async () => {
+    let postCount = 0;
+    const credStore = mockCredentialStore(true);
+    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
+      post: async (_url, body) => {
+        postCount++;
+        const params = new URLSearchParams(body);
+        assert.strictEqual(params.get('grant_type'), 'refresh_token');
         return { data: { access_token: 'new-device-at', token_type: 'Bearer', expires_in: 3600 } };
       },
     }));
 
-    // Set up in-memory state as if initializeForDevice() ran
     client.oauthServerUrl = 'https://auth.example.com';
     client.tokenEndpoint = 'https://auth.example.com/token';
-    client.deviceClientId = 'device-client-id';
-    client._deviceInitialized = true;
     client._discovered = true;
 
-    // Seed refresh token in credential store
     credStore._secrets['mcp.test.example.com'] = JSON.stringify({
       accessToken: 'old-at',
       refreshToken: 'device-refresh-token',
@@ -287,7 +326,27 @@ describe('MCPAuthClient - Credential Store Integration', () => {
 
     const newToken = await client.refreshToken();
     assert.strictEqual(newToken, 'new-device-at');
-    assert.strictEqual(postCount, 1, 'only one POST — no DCR registration');
+    assert.strictEqual(postCount, 1);
+  });
+
+  it('should throw when clientId is not available during refresh', async () => {
+    const credStore = mockCredentialStore(true);
+    const { client, storePath } = createClient(tmpDir, credStore);
+
+    client.oauthServerUrl = 'https://auth.example.com';
+    client.tokenEndpoint = 'https://auth.example.com/token';
+    client._discovered = true;
+
+    credStore._secrets['mcp.test.example.com'] = JSON.stringify({
+      accessToken: 'old-at',
+      refreshToken: 'my-refresh-token',
+    });
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({ tokens: { credentialStore: true } }),
+    );
+
+    await assert.rejects(() => client.refreshToken(), /No client ID/);
   });
 
   describe('getTokenState', () => {
@@ -326,6 +385,30 @@ describe('MCPAuthClient - Credential Store Integration', () => {
       const state = await client.getTokenState();
       assert.strictEqual(state.authenticated, false);
       assert.strictEqual(state.usingCredentialStore, false);
+    });
+
+    it('should return not-authenticated when credential store is unavailable', async () => {
+      const credStore = mockCredentialStore(true);
+      const { client, storePath } = createInitializedClient(tmpDir, credStore);
+
+      // Simulate keyring locked / dbus unavailable
+      credStore.getSecret = () => null;
+
+      await fs.writeFile(
+        storePath,
+        JSON.stringify({
+          tokens: {
+            credentialStore: true,
+            expiresAt: Date.now() + 3600000,
+          },
+          mcpAuth: { clientId: 'my-client' },
+        }),
+      );
+
+      const state = await client.getTokenState();
+      assert.strictEqual(state.authenticated, false);
+      assert.strictEqual(state.usingCredentialStore, true);
+      assert.strictEqual(state.clientId, 'my-client');
     });
 
     it('should report expired tokens', async () => {
@@ -376,9 +459,9 @@ describe('MCPAuthClient - initialize()', () => {
         if (url.includes('oauth-authorization-server')) {
           return {
             data: {
-              authorization_endpoint: 'https://auth.example.com/authorize',
               token_endpoint: 'https://auth.example.com/token',
               registration_endpoint: 'https://auth.example.com/register',
+              device_authorization_endpoint: 'https://auth.example.com/devicecode',
             },
           };
         }
@@ -394,16 +477,19 @@ describe('MCPAuthClient - initialize()', () => {
     await client.initialize();
 
     assert.strictEqual(client.clientId, 'registered-client-123');
-    assert.strictEqual(client.authorizationEndpoint, 'https://auth.example.com/authorize');
     assert.strictEqual(client.tokenEndpoint, 'https://auth.example.com/token');
 
-    // Should have called protected-resource and authorization-server discovery
     assert.ok(requests.gets.some((u) => u.includes('oauth-protected-resource')));
     assert.ok(requests.gets.some((u) => u.includes('oauth-authorization-server')));
 
-    // Should have registered via DCR
     assert.strictEqual(requests.posts.length, 1);
     assert.ok(requests.posts[0].url.includes('/register'));
+
+    // Should use device_code grant type
+    const body = typeof requests.posts[0].body === 'string'
+      ? JSON.parse(requests.posts[0].body)
+      : requests.posts[0].body;
+    assert.deepStrictEqual(body.grant_types, ['urn:ietf:params:oauth:grant-type:device_code']);
   });
 
   it('should use cached metadata on second call', async () => {
@@ -416,9 +502,9 @@ describe('MCPAuthClient - initialize()', () => {
         }
         return {
           data: {
-            authorization_endpoint: 'https://auth.example.com/authorize',
             token_endpoint: 'https://auth.example.com/token',
             registration_endpoint: 'https://auth.example.com/register',
+            device_authorization_endpoint: 'https://auth.example.com/devicecode',
           },
         };
       },
@@ -429,7 +515,6 @@ describe('MCPAuthClient - initialize()', () => {
     await client.initialize();
     const firstGetCount = getCount;
 
-    // Second call should be a no-op
     await client.initialize();
     assert.strictEqual(getCount, firstGetCount);
   });
@@ -443,15 +528,14 @@ describe('MCPAuthClient - initialize()', () => {
         }
         return {
           data: {
-            authorization_endpoint: 'https://auth.example.com/authorize',
             token_endpoint: 'https://auth.example.com/token',
             registration_endpoint: 'https://auth.example.com/register',
+            device_authorization_endpoint: 'https://auth.example.com/devicecode',
           },
         };
       },
       post: async () => {
         postCount++;
-        // Simulate network delay
         await new Promise((r) => setTimeout(r, 10));
         return { data: { client_id: 'concurrent-client' } };
       },
@@ -459,19 +543,188 @@ describe('MCPAuthClient - initialize()', () => {
 
     const { client } = createClient(tmpDir, mockCredentialStore(), http);
 
-    // Call initialize concurrently
     await Promise.all([client.initialize(), client.initialize(), client.initialize()]);
 
-    // Should only register once despite 3 concurrent calls
     assert.strictEqual(postCount, 1);
   });
 
-  it('should validate code parameter in exchangeCodeForToken', async () => {
-    const { client } = createInitializedClient(tmpDir, mockCredentialStore());
-    await assert.rejects(
-      () => client.exchangeCodeForToken({ state: 's', codeVerifier: 'v' }),
-      /code is required/,
+  it('should throw when server does not support device flow', async () => {
+    const http = mockHttpClient({
+      get: async (url) => {
+        if (url.includes('oauth-protected-resource')) {
+          return { data: { authorization_servers: ['https://auth.example.com'] } };
+        }
+        return {
+          data: {
+            token_endpoint: 'https://auth.example.com/token',
+          },
+        };
+      },
+    });
+
+    const { client } = createClient(tmpDir, mockCredentialStore(), http);
+    await assert.rejects(() => client.initialize(), /not supported/);
+  });
+
+  it('should reject non-HTTPS endpoints from discovery', async () => {
+    const http = mockHttpClient({
+      get: async (url) => {
+        if (url.includes('oauth-protected-resource')) {
+          return { data: { authorization_servers: ['http://evil.example.com'] } };
+        }
+        return {
+          data: {
+            token_endpoint: 'http://evil.example.com/token',
+            device_authorization_endpoint: 'http://evil.example.com/devicecode',
+          },
+        };
+      },
+    });
+
+    const { client } = createClient(tmpDir, mockCredentialStore(), http);
+    await assert.rejects(() => client.initialize(), /must use HTTPS/);
+  });
+
+  it('should reject non-HTTPS token endpoint from metadata', async () => {
+    const http = mockHttpClient({
+      get: async (url) => {
+        if (url.includes('oauth-protected-resource')) {
+          return { data: { authorization_servers: ['https://auth.example.com'] } };
+        }
+        return {
+          data: {
+            token_endpoint: 'http://evil.example.com/token',
+            device_authorization_endpoint: 'https://auth.example.com/devicecode',
+          },
+        };
+      },
+    });
+
+    const { client } = createClient(tmpDir, mockCredentialStore(), http);
+    await assert.rejects(() => client.initialize(), /must use HTTPS/);
+  });
+
+  it('should throw when no authorization server is found', async () => {
+    const http = mockHttpClient({
+      get: async (url) => {
+        if (url.includes('oauth-protected-resource')) {
+          return { data: { authorization_servers: [] } };
+        }
+        return { data: {} };
+      },
+    });
+
+    const { client } = createClient(tmpDir, mockCredentialStore(), http);
+    await assert.rejects(() => client.initialize(), /No authorization server/);
+  });
+
+  it('should re-discover when cached metadata lacks deviceAuthorizationEndpoint', async () => {
+    let discoveryCount = 0;
+    const http = mockHttpClient({
+      get: async (url) => {
+        if (url.includes('oauth-protected-resource')) {
+          return { data: { authorization_servers: ['https://auth.example.com'] } };
+        }
+        if (url.includes('oauth-authorization-server')) {
+          discoveryCount++;
+          return {
+            data: {
+              token_endpoint: 'https://auth.example.com/token',
+              registration_endpoint: 'https://auth.example.com/register',
+              device_authorization_endpoint: 'https://auth.example.com/devicecode',
+            },
+          };
+        }
+        return { data: {} };
+      },
+      post: async () => ({ data: { client_id: 'rediscovered-client' } }),
+    });
+
+    const { client, storePath } = createClient(tmpDir, mockCredentialStore(), http);
+
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({
+        mcpAuth: {
+          oauthServerUrl: 'https://auth.example.com',
+          tokenEndpoint: 'https://auth.example.com/token',
+          registrationEndpoint: 'https://auth.example.com/register',
+        },
+      }),
     );
+
+    await client.initialize();
+
+    assert.strictEqual(client.deviceAuthorizationEndpoint, 'https://auth.example.com/devicecode');
+    assert.strictEqual(client.clientId, 'rediscovered-client');
+    assert.strictEqual(discoveryCount, 1);
+  });
+
+  it('should reuse cached clientId without re-registering', async () => {
+    let postCount = 0;
+    const http = mockHttpClient({
+      get: async (url) => {
+        if (url.includes('oauth-protected-resource')) {
+          return { data: { authorization_servers: ['https://auth.example.com'] } };
+        }
+        return {
+          data: {
+            token_endpoint: 'https://auth.example.com/token',
+            device_authorization_endpoint: 'https://auth.example.com/devicecode',
+          },
+        };
+      },
+      post: async () => {
+        postCount++;
+        return { data: { client_id: 'should-not-register' } };
+      },
+    });
+
+    const { client, storePath } = createClient(tmpDir, mockCredentialStore(), http);
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({
+        mcpAuth: {
+          oauthServerUrl: 'https://auth.example.com',
+          tokenEndpoint: 'https://auth.example.com/token',
+          deviceAuthorizationEndpoint: 'https://auth.example.com/devicecode',
+          clientId: 'cached-client-id',
+        },
+      }),
+    );
+
+    await client.initialize();
+
+    assert.strictEqual(client.clientId, 'cached-client-id');
+    assert.strictEqual(postCount, 0);
+  });
+
+  it('should support legacy deviceClientId in store', async () => {
+    let postCount = 0;
+    const http = mockHttpClient({
+      post: async () => {
+        postCount++;
+        return { data: { client_id: 'should-not-register' } };
+      },
+    });
+
+    const { client, storePath } = createClient(tmpDir, mockCredentialStore(), http);
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({
+        mcpAuth: {
+          oauthServerUrl: 'https://auth.example.com',
+          tokenEndpoint: 'https://auth.example.com/token',
+          deviceAuthorizationEndpoint: 'https://auth.example.com/devicecode',
+          deviceClientId: 'legacy-device-id',
+        },
+      }),
+    );
+
+    await client.initialize();
+
+    assert.strictEqual(client.clientId, 'legacy-device-id');
+    assert.strictEqual(postCount, 0);
   });
 
   it('should fall back to openid-configuration when oauth-authorization-server is not available', async () => {
@@ -483,13 +736,11 @@ describe('MCPAuthClient - initialize()', () => {
           return { data: { authorization_servers: ['https://auth.example.com'] } };
         }
         if (url.includes('oauth-authorization-server')) {
-          // Simulate 404 / empty body — no token_endpoint means fallback triggers
           return { data: {} };
         }
         if (url.includes('openid-configuration')) {
           return {
             data: {
-              authorization_endpoint: 'https://auth.example.com/authorize',
               token_endpoint: 'https://auth.example.com/token',
               registration_endpoint: 'https://auth.example.com/register',
               device_authorization_endpoint: 'https://auth.example.com/devicecode',
@@ -508,66 +759,52 @@ describe('MCPAuthClient - initialize()', () => {
     assert.strictEqual(client.tokenEndpoint, 'https://auth.example.com/token');
     assert.strictEqual(client.deviceAuthorizationEndpoint, 'https://auth.example.com/devicecode');
 
-    // Both discovery URLs should have been attempted
+    assert.ok(requests.gets.some((u) => u.includes('oauth-authorization-server')));
+    assert.ok(requests.gets.some((u) => u.includes('openid-configuration')));
+  });
+
+  it('should merge device_authorization_endpoint from OIDC when RFC 8414 omits it', async () => {
+    const requests = { gets: [] };
+    const http = mockHttpClient({
+      get: async (url) => {
+        requests.gets.push(url);
+        if (url.includes('oauth-protected-resource')) {
+          return { data: { authorization_servers: ['https://auth.example.com'] } };
+        }
+        if (url.includes('oauth-authorization-server')) {
+          return {
+            data: {
+              token_endpoint: 'https://auth.example.com/token',
+              registration_endpoint: 'https://auth.example.com/register',
+            },
+          };
+        }
+        if (url.includes('openid-configuration')) {
+          return {
+            data: {
+              token_endpoint: 'https://auth.example.com/token',
+              device_authorization_endpoint: 'https://auth.example.com/devicecode',
+            },
+          };
+        }
+        return { data: {} };
+      },
+      post: async () => ({ data: { client_id: 'merged-client' } }),
+    });
+
+    const { client } = createClient(tmpDir, mockCredentialStore(), http);
+    await client.initialize();
+
+    assert.strictEqual(client.deviceAuthorizationEndpoint, 'https://auth.example.com/devicecode');
+    assert.strictEqual(client.tokenEndpoint, 'https://auth.example.com/token');
+    assert.strictEqual(client.registrationEndpoint, 'https://auth.example.com/register');
+
     assert.ok(requests.gets.some((u) => u.includes('oauth-authorization-server')));
     assert.ok(requests.gets.some((u) => u.includes('openid-configuration')));
   });
 });
 
-describe('MCPAuthClient - getAuthorizationUrl()', () => {
-  let tmpDir;
-
-  beforeEach(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fdx-urltest-'));
-  });
-
-  afterEach(async () => {
-    await fs.rm(tmpDir, { recursive: true, force: true });
-  });
-
-  it('should include all required OAuth parameters', async () => {
-    const { client } = createInitializedClient(tmpDir, mockCredentialStore());
-
-    const { url, state, codeVerifier, codeChallenge } = await client.getAuthorizationUrl();
-    const parsed = new URL(url);
-
-    assert.strictEqual(parsed.origin, 'https://auth.example.com');
-    assert.strictEqual(parsed.pathname, '/authorize');
-    assert.strictEqual(parsed.searchParams.get('response_type'), 'code');
-    assert.strictEqual(parsed.searchParams.get('client_id'), 'test-client-id');
-    assert.strictEqual(
-      parsed.searchParams.get('redirect_uri'),
-      'http://localhost:6260/oauth/callback',
-    );
-    assert.strictEqual(parsed.searchParams.get('code_challenge_method'), 'S256');
-    assert.strictEqual(parsed.searchParams.get('prompt'), 'consent');
-    assert.strictEqual(parsed.searchParams.get('resource'), 'https://mcp.test.example.com');
-
-    // PKCE values should be present
-    assert.ok(state);
-    assert.ok(codeVerifier);
-    assert.ok(codeChallenge);
-    assert.strictEqual(parsed.searchParams.get('state'), state);
-    assert.strictEqual(parsed.searchParams.get('code_challenge'), codeChallenge);
-
-    // Scope should include required values
-    const scope = parsed.searchParams.get('scope');
-    assert.ok(scope.includes('openid'));
-    assert.ok(scope.includes('offline_access'));
-  });
-
-  it('should generate unique state and verifier each time', async () => {
-    const { client } = createInitializedClient(tmpDir, mockCredentialStore());
-
-    const first = await client.getAuthorizationUrl();
-    const second = await client.getAuthorizationUrl();
-
-    assert.notStrictEqual(first.state, second.state);
-    assert.notStrictEqual(first.codeVerifier, second.codeVerifier);
-  });
-});
-
-describe('MCPAuthClient - Device Authorization Flow (RFC 8628)', () => {
+describe('MCPAuthClient - Device Flow (RFC 8628)', () => {
   let tmpDir;
 
   beforeEach(async () => {
@@ -578,158 +815,8 @@ describe('MCPAuthClient - Device Authorization Flow (RFC 8628)', () => {
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
-  describe('initializeForDevice', () => {
-    it('should register device client via DCR and cache deviceClientId', async () => {
-      const http = mockHttpClient({
-        get: async (url) => {
-          if (url.includes('oauth-protected-resource')) {
-            return { data: { authorization_servers: ['https://auth.example.com'] } };
-          }
-          if (url.includes('oauth-authorization-server')) {
-            return {
-              data: {
-                authorization_endpoint: 'https://auth.example.com/authorize',
-                token_endpoint: 'https://auth.example.com/token',
-                registration_endpoint: 'https://auth.example.com/register',
-                device_authorization_endpoint: 'https://auth.example.com/devicecode',
-              },
-            };
-          }
-          return { data: {} };
-        },
-        post: async () => ({ data: { client_id: 'device-registered-id' } }),
-      });
-
-      const { client } = createClient(tmpDir, mockCredentialStore(), http);
-      await client.initializeForDevice();
-
-      assert.strictEqual(client.deviceClientId, 'device-registered-id');
-      assert.strictEqual(client._deviceInitialized, true);
-    });
-
-    it('should use no redirect_uris and only device_code grant in DCR', async () => {
-      let registrationBody;
-      const http = mockHttpClient({
-        get: async (url) => {
-          if (url.includes('oauth-protected-resource')) {
-            return { data: { authorization_servers: ['https://auth.example.com'] } };
-          }
-          return {
-            data: {
-              token_endpoint: 'https://auth.example.com/token',
-              registration_endpoint: 'https://auth.example.com/register',
-              device_authorization_endpoint: 'https://auth.example.com/devicecode',
-            },
-          };
-        },
-        post: async (_url, body) => {
-          registrationBody = typeof body === 'string' ? body : JSON.stringify(body);
-          return { data: { client_id: 'device-id' } };
-        },
-      });
-
-      const { client } = createClient(tmpDir, mockCredentialStore(), http);
-      await client.initializeForDevice();
-
-      const parsed = JSON.parse(registrationBody);
-      assert.deepStrictEqual(parsed.grant_types, ['urn:ietf:params:oauth:grant-type:device_code']);
-      assert.strictEqual(parsed.redirect_uris, undefined);
-    });
-
-    it('should reuse cached deviceClientId without re-registering', async () => {
-      let postCount = 0;
-      const http = mockHttpClient({
-        get: async (url) => {
-          if (url.includes('oauth-protected-resource')) {
-            return { data: { authorization_servers: ['https://auth.example.com'] } };
-          }
-          return {
-            data: {
-              token_endpoint: 'https://auth.example.com/token',
-              device_authorization_endpoint: 'https://auth.example.com/devicecode',
-            },
-          };
-        },
-        post: async () => {
-          postCount++;
-          return { data: { client_id: 'device-id' } };
-        },
-      });
-
-      const { client, storePath } = createClient(tmpDir, mockCredentialStore(), http);
-      await fs.writeFile(
-        storePath,
-        JSON.stringify({
-          mcpAuth: {
-            oauthServerUrl: 'https://auth.example.com',
-            tokenEndpoint: 'https://auth.example.com/token',
-            deviceAuthorizationEndpoint: 'https://auth.example.com/devicecode',
-            deviceClientId: 'cached-device-id',
-          },
-        }),
-      );
-
-      await client.initializeForDevice();
-
-      assert.strictEqual(client.deviceClientId, 'cached-device-id');
-      assert.strictEqual(postCount, 0);
-    });
-
-    it('should throw when server does not support device flow', async () => {
-      const http = mockHttpClient({
-        get: async (url) => {
-          if (url.includes('oauth-protected-resource')) {
-            return { data: { authorization_servers: ['https://auth.example.com'] } };
-          }
-          return {
-            data: {
-              token_endpoint: 'https://auth.example.com/token',
-              // no device_authorization_endpoint
-            },
-          };
-        },
-      });
-
-      const { client } = createClient(tmpDir, mockCredentialStore(), http);
-      await assert.rejects(() => client.initializeForDevice(), /not supported/);
-    });
-
-    it('should store interactive and device clientIds independently', async () => {
-      let postCount = 0;
-      const http = mockHttpClient({
-        get: async (url) => {
-          if (url.includes('oauth-protected-resource')) {
-            return { data: { authorization_servers: ['https://auth.example.com'] } };
-          }
-          return {
-            data: {
-              authorization_endpoint: 'https://auth.example.com/authorize',
-              token_endpoint: 'https://auth.example.com/token',
-              registration_endpoint: 'https://auth.example.com/register',
-              device_authorization_endpoint: 'https://auth.example.com/devicecode',
-            },
-          };
-        },
-        post: async () => {
-          postCount++;
-          return { data: { client_id: `client-${postCount}` } };
-        },
-      });
-
-      const { client, storePath } = createClient(tmpDir, mockCredentialStore(), http);
-      await client.initialize();
-      await client.initializeForDevice();
-
-      const file = JSON.parse(await fs.readFile(storePath, 'utf8'));
-      assert.ok(file.mcpAuth.clientId, 'interactive clientId should be stored');
-      assert.ok(file.mcpAuth.deviceClientId, 'device clientId should be stored');
-      assert.notStrictEqual(file.mcpAuth.clientId, file.mcpAuth.deviceClientId);
-      assert.strictEqual(postCount, 2);
-    });
-  });
-
   it('startDeviceFlow should return device code info', async () => {
-    const { client } = createDeviceClient(tmpDir, mockCredentialStore());
+    const { client } = createInitializedClient(tmpDir, mockCredentialStore());
 
     client.httpClient.post = async (url) => {
       assert.ok(url.includes('/devicecode'));
@@ -754,7 +841,7 @@ describe('MCPAuthClient - Device Authorization Flow (RFC 8628)', () => {
   });
 
   it('startDeviceFlow should default interval to 5 when not provided by server', async () => {
-    const { client } = createDeviceClient(tmpDir, mockCredentialStore());
+    const { client } = createInitializedClient(tmpDir, mockCredentialStore());
 
     client.httpClient.post = async () => ({
       data: { device_code: 'd', user_code: 'U', verification_uri: 'https://v.example.com', expires_in: 900 },
@@ -764,16 +851,9 @@ describe('MCPAuthClient - Device Authorization Flow (RFC 8628)', () => {
     assert.strictEqual(result.interval, 5);
   });
 
-  it('startDeviceFlow should throw when device flow is not supported by server', async () => {
-    const { client } = createDeviceClient(tmpDir, mockCredentialStore());
-    client.deviceAuthorizationEndpoint = undefined;
-
-    await assert.rejects(() => client.startDeviceFlow(), /not supported/);
-  });
-
   it('pollDeviceToken should succeed after authorization_pending responses', async () => {
     const credStore = mockCredentialStore();
-    const { client } = createDeviceClient(tmpDir, credStore);
+    const { client } = createInitializedClient(tmpDir, credStore);
 
     let callCount = 0;
     client.httpClient.post = async () => {
@@ -794,7 +874,7 @@ describe('MCPAuthClient - Device Authorization Flow (RFC 8628)', () => {
   });
 
   it('pollDeviceToken should increase poll interval on slow_down', async () => {
-    const { client } = createDeviceClient(tmpDir, mockCredentialStore());
+    const { client } = createInitializedClient(tmpDir, mockCredentialStore());
 
     let callCount = 0;
     client.httpClient.post = async () => {
@@ -815,7 +895,7 @@ describe('MCPAuthClient - Device Authorization Flow (RFC 8628)', () => {
   });
 
   it('pollDeviceToken should throw on access_denied', async () => {
-    const { client } = createDeviceClient(tmpDir, mockCredentialStore());
+    const { client } = createInitializedClient(tmpDir, mockCredentialStore());
 
     client.httpClient.post = async () => {
       const err = new Error('access_denied');
@@ -830,7 +910,7 @@ describe('MCPAuthClient - Device Authorization Flow (RFC 8628)', () => {
   });
 
   it('pollDeviceToken should throw on expired_token', async () => {
-    const { client } = createDeviceClient(tmpDir, mockCredentialStore());
+    const { client } = createInitializedClient(tmpDir, mockCredentialStore());
 
     client.httpClient.post = async () => {
       const err = new Error('expired_token');
@@ -844,9 +924,24 @@ describe('MCPAuthClient - Device Authorization Flow (RFC 8628)', () => {
     );
   });
 
+  it('pollDeviceToken should throw when deadline is exceeded', async () => {
+    const { client } = createInitializedClient(tmpDir, mockCredentialStore());
+
+    client.httpClient.post = async () => {
+      const err = new Error('authorization_pending');
+      err.response = { data: { error: 'authorization_pending' } };
+      throw err;
+    };
+
+    await assert.rejects(
+      () => client.pollDeviceToken({ deviceCode: 'device-code', interval: 0, expiresIn: 0 }),
+      /expired/i,
+    );
+  });
+
   it('pollDeviceToken should store tokens in credential store on success', async () => {
     const credStore = mockCredentialStore();
-    const { client } = createDeviceClient(tmpDir, credStore);
+    const { client } = createInitializedClient(tmpDir, credStore);
 
     client.httpClient.post = async () => ({
       data: { access_token: 'device-at', refresh_token: 'device-rt', token_type: 'Bearer', expires_in: 3600 },
@@ -875,7 +970,6 @@ describe('MCPAuthClient - logout()', () => {
     const credStore = mockCredentialStore();
     const { client, storePath } = createInitializedClient(tmpDir, credStore);
 
-    // Seed a secret as if the user is authenticated
     credStore.setSecret('mcp.test.example.com', JSON.stringify({ accessToken: 'at', refreshToken: 'rt' }));
     await fs.writeFile(storePath, JSON.stringify({ mcpAuth: { clientId: 'cid' }, tokens: { accessToken: 'at' } }));
 
@@ -890,7 +984,7 @@ describe('MCPAuthClient - logout()', () => {
 
     await fs.writeFile(
       storePath,
-      JSON.stringify({ mcpAuth: { clientId: 'cid', deviceClientId: 'dcid' }, tokens: { accessToken: 'at' } }),
+      JSON.stringify({ mcpAuth: { clientId: 'cid' }, tokens: { accessToken: 'at' } }),
     );
 
     await client.logout();
@@ -898,7 +992,6 @@ describe('MCPAuthClient - logout()', () => {
     const file = JSON.parse(await fs.readFile(storePath, 'utf8'));
     assert.ok(file.mcpAuth, 'mcpAuth should be preserved');
     assert.strictEqual(file.mcpAuth.clientId, 'cid');
-    assert.strictEqual(file.mcpAuth.deviceClientId, 'dcid');
     assert.strictEqual(file.tokens, undefined, 'tokens should be removed');
   });
 
@@ -906,15 +999,12 @@ describe('MCPAuthClient - logout()', () => {
     const credStore = mockCredentialStore();
     const { client, storePath } = createInitializedClient(tmpDir, credStore);
 
-    // Also mark device as initialized
-    client._deviceInitialized = true;
     client._discovered = true;
 
     await fs.writeFile(storePath, JSON.stringify({}));
     await client.logout();
 
     assert.strictEqual(client._initialized, false);
-    assert.strictEqual(client._deviceInitialized, false);
     assert.strictEqual(client._discovered, false);
   });
 
@@ -924,7 +1014,6 @@ describe('MCPAuthClient - logout()', () => {
 
     await fs.writeFile(storePath, JSON.stringify({ mcpAuth: { clientId: 'cid' } }));
 
-    // Should complete without error even if there was never a secret
     await assert.doesNotReject(() => client.logout());
   });
 
@@ -932,7 +1021,6 @@ describe('MCPAuthClient - logout()', () => {
     const credStore = mockCredentialStore();
     const { client } = createClient(tmpDir, credStore);
 
-    // storePath points to a non-existent file
     await assert.doesNotReject(() => client.logout());
   });
 });

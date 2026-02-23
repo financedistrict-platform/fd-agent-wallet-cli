@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-02-23
+
+### Added
+
+- Proactive token refresh — `MCPClient` now detects when the access token has changed (e.g. after a background refresh) and reconnects automatically before making a call
+- `SESSION_EXPIRED` error code — when the refresh token is also expired (`invalid_grant` / `interaction_required`), the CLI returns a clear `SESSION_EXPIRED` error instead of a cryptic 400
+- `fdx login` command (replaces `fdx setup` as the primary auth command)
+- `fdx signup` command — directs users to `https://fd.xyz/signup`
+
+### Changed
+
+- `fdx setup` is now a hidden backward-compatible alias for `fdx login`
+- All user-facing messages updated from "fdx setup" to "fdx login"
+- README rewritten — positioned as official Finance District Agent Wallet CLI, added Why FDX section, Quick Start with signup flow, Agent Wallet Skills integration
+
+### Fixed
+
+- Auth token not renewed after days of inactivity — tokens baked into the transport at connect time were never replaced, even after a successful background refresh
+- Verification URL in README corrected to `https://auth.fd.xyz/device`
+
 ## [0.1.2] - 2026-02-19
 
 ### Changed

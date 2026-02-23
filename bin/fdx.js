@@ -27,10 +27,24 @@ program
   );
 
 program
-  .command('setup')
-  .description('Run OAuth 2.1 device authorization flow')
+  .command('login')
+  .description('Authenticate via OAuth 2.1 device authorization flow')
   .action(async () => {
-    await require('./commands/setup')();
+    await require('./commands/login')();
+  });
+
+program
+  .command('signup')
+  .description('Open the Finance District sign-up page')
+  .action(async () => {
+    await require('./commands/signup')();
+  });
+
+program
+  .command('setup', { hidden: true })
+  .description('Alias for "login" (deprecated)')
+  .action(async () => {
+    await require('./commands/login')();
   });
 
 program

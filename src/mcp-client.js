@@ -17,12 +17,14 @@ class MCPClient {
     this.authClient = authClient;
     this._client = null;
     this._transport = null;
+    this._currentAccessToken = null;
   }
 
   async connect() {
     await this.close();
 
     const accessToken = await this.authClient.getAccessToken();
+    this._currentAccessToken = accessToken;
 
     this._transport = new StreamableHTTPClientTransport(new URL(this.mcpServerUrl), {
       requestInit: {
@@ -37,13 +39,31 @@ class MCPClient {
     await this._client.connect(this._transport);
   }
 
+  async #ensureFreshConnection() {
+    try {
+      const freshToken = await this.authClient.getAccessToken();
+      if (freshToken !== this._currentAccessToken) {
+        logger.debug('mcp: token refreshed, reconnecting', { server: this.mcpServerUrl });
+        await this.connect();
+      }
+    } catch (err) {
+      if (isSessionExpired(err)) throw err;
+      // Token retrieval failed — continue with existing connection.
+      // The 401 retry will handle re-auth if needed.
+    }
+  }
+
   async callTool(toolName, args, retried = false) {
     if (!toolName) throw new Error('toolName is required');
 
     logger.debug('mcp: calling tool', { tool: toolName, args });
 
     try {
-      if (!this._client) await this.connect();
+      if (!this._client) {
+        await this.connect();
+      } else {
+        await this.#ensureFreshConnection();
+      }
 
       const result = await this._client.callTool({
         name: toolName,
@@ -71,6 +91,17 @@ class MCPClient {
       logger.info('mcp: tool call succeeded', { tool: toolName });
       return { data: result.content };
     } catch (error) {
+      // Session fully expired — no point retrying, user must re-authenticate
+      if (isSessionExpired(error)) {
+        logger.error('mcp: session expired', { tool: toolName, error: error.message });
+        return {
+          error: {
+            code: 'SESSION_EXPIRED',
+            message: error.message,
+          },
+        };
+      }
+
       // Handle auth failures — reconnect with refreshed token once
       if (!retried && isAuthError(error)) {
         logger.warn('mcp: 401 on tool call, retrying after token refresh', { tool: toolName });
@@ -79,6 +110,15 @@ class MCPClient {
           await this.authClient.refreshToken();
           return this.callTool(toolName, args, true);
         } catch (refreshError) {
+          if (isSessionExpired(refreshError)) {
+            logger.error('mcp: session expired during retry', { tool: toolName });
+            return {
+              error: {
+                code: 'SESSION_EXPIRED',
+                message: refreshError.message,
+              },
+            };
+          }
           logger.error('mcp: token refresh failed during tool call', { tool: toolName, error: refreshError.message });
           return {
             error: {
@@ -113,10 +153,15 @@ class MCPClient {
 
   async listTools(retried = false) {
     try {
-      if (!this._client) await this.connect();
+      if (!this._client) {
+        await this.connect();
+      } else {
+        await this.#ensureFreshConnection();
+      }
       const result = await this._client.listTools();
       return result.tools;
     } catch (error) {
+      if (isSessionExpired(error)) throw error;
       if (!retried && isAuthError(error)) {
         await this.close();
         await this.authClient.refreshToken();
@@ -135,6 +180,10 @@ class MCPClient {
     this._client = null;
     this._transport = null;
   }
+}
+
+function isSessionExpired(error) {
+  return error?.code === 'SESSION_EXPIRED';
 }
 
 function isAuthError(error) {

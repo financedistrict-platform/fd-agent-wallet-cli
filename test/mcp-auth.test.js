@@ -349,6 +349,157 @@ describe('MCPAuthClient - Credential Store Integration', () => {
     await assert.rejects(() => client.refreshToken(), /No client ID/);
   });
 
+  it('should throw SESSION_EXPIRED when no refresh token is available', async () => {
+    const credStore = mockCredentialStore(true);
+    const { client, storePath } = createInitializedClient(tmpDir, credStore);
+
+    credStore._secrets['mcp.test.example.com'] = JSON.stringify({
+      accessToken: 'old-at',
+    });
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({ mcpAuth: { clientId: 'cid' }, tokens: { credentialStore: true, expiresAt: Date.now() - 60000 } }),
+    );
+
+    await assert.rejects(
+      () => client.refreshToken(),
+      (err) => {
+        assert.strictEqual(err.code, 'SESSION_EXPIRED');
+        assert.ok(err.message.includes('fdx login'));
+        return true;
+      },
+    );
+  });
+
+  it('should throw SESSION_EXPIRED when server returns invalid_grant', async () => {
+    const credStore = mockCredentialStore(true);
+    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
+      post: async () => {
+        const err = new Error('Request failed with status code 400');
+        err.response = { data: { error: 'invalid_grant', error_description: 'Refresh token expired' } };
+        throw err;
+      },
+    }));
+
+    client.oauthServerUrl = 'https://auth.example.com';
+    client.tokenEndpoint = 'https://auth.example.com/token';
+    client.clientId = 'my-client-id';
+    client._discovered = true;
+
+    credStore._secrets['mcp.test.example.com'] = JSON.stringify({
+      accessToken: 'old-at',
+      refreshToken: 'expired-refresh-token',
+    });
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({ mcpAuth: { clientId: 'my-client-id' }, tokens: { credentialStore: true } }),
+    );
+
+    await assert.rejects(
+      () => client.refreshToken(),
+      (err) => {
+        assert.strictEqual(err.code, 'SESSION_EXPIRED');
+        assert.ok(err.message.includes('fdx login'));
+        return true;
+      },
+    );
+  });
+
+  it('should throw SESSION_EXPIRED when server returns interaction_required', async () => {
+    const credStore = mockCredentialStore(true);
+    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
+      post: async () => {
+        const err = new Error('Request failed with status code 400');
+        err.response = { data: { error: 'interaction_required' } };
+        throw err;
+      },
+    }));
+
+    client.oauthServerUrl = 'https://auth.example.com';
+    client.tokenEndpoint = 'https://auth.example.com/token';
+    client.clientId = 'my-client-id';
+    client._discovered = true;
+
+    credStore._secrets['mcp.test.example.com'] = JSON.stringify({
+      accessToken: 'old-at',
+      refreshToken: 'stale-refresh',
+    });
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({ mcpAuth: { clientId: 'my-client-id' }, tokens: { credentialStore: true } }),
+    );
+
+    await assert.rejects(
+      () => client.refreshToken(),
+      (err) => {
+        assert.strictEqual(err.code, 'SESSION_EXPIRED');
+        return true;
+      },
+    );
+  });
+
+  it('should propagate SESSION_EXPIRED through getAccessToken when token is expired', async () => {
+    const credStore = mockCredentialStore(true);
+    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
+      post: async () => {
+        const err = new Error('Request failed with status code 400');
+        err.response = { data: { error: 'invalid_grant' } };
+        throw err;
+      },
+    }));
+
+    client.oauthServerUrl = 'https://auth.example.com';
+    client.tokenEndpoint = 'https://auth.example.com/token';
+    client.clientId = 'my-client-id';
+    client._discovered = true;
+
+    credStore._secrets['mcp.test.example.com'] = JSON.stringify({
+      accessToken: 'old-at',
+      refreshToken: 'expired-rt',
+    });
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({
+        mcpAuth: { clientId: 'my-client-id' },
+        tokens: { credentialStore: true, expiresAt: Date.now() - 60000 },
+      }),
+    );
+
+    await assert.rejects(
+      () => client.getAccessToken(),
+      (err) => {
+        assert.strictEqual(err.code, 'SESSION_EXPIRED');
+        return true;
+      },
+    );
+  });
+
+  it('should re-throw non-invalid_grant errors during refresh', async () => {
+    const credStore = mockCredentialStore(true);
+    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
+      post: async () => {
+        const err = new Error('Network error');
+        throw err;
+      },
+    }));
+
+    client.oauthServerUrl = 'https://auth.example.com';
+    client.tokenEndpoint = 'https://auth.example.com/token';
+    client.clientId = 'my-client-id';
+    client._discovered = true;
+
+    credStore._secrets['mcp.test.example.com'] = JSON.stringify({
+      accessToken: 'old-at',
+      refreshToken: 'my-rt',
+    });
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({ mcpAuth: { clientId: 'my-client-id' }, tokens: { credentialStore: true } }),
+    );
+
+    await assert.rejects(() => client.refreshToken(), /Network error/);
+  });
+
   describe('getTokenState', () => {
     it('should return authenticated state from credential store', async () => {
       const credStore = mockCredentialStore(true);

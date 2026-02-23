@@ -32,12 +32,12 @@ Verify the `fdx` command is available:
 fdx
 ```
 
-Should print usage info with `setup`, `status`, `call` commands.
+Should print usage info with `login`, `signup`, `status`, `call` commands.
 
-## 3. Run setup
+## 3. Run login
 
 ```bash
-fdx setup
+fdx login
 ```
 
 This will:
@@ -49,7 +49,7 @@ This will:
 - Exchange the code for tokens
 - Write tokens to `~/.fdx/auth.json`
 
-If the machine is headless and you can't open a browser, run `fdx setup` on your local machine instead, then copy the token file:
+If the machine is headless and you can't open a browser, run `fdx login` on your local machine instead, then copy the token file:
 
 ```bash
 # From local machine
@@ -65,7 +65,7 @@ fdx call getMyInfo
 fdx call getAppVersion
 ```
 
-All three should return data. If `fdx call` fails with auth errors, run `fdx setup` again.
+All three should return data. If `fdx call` fails with auth errors, run `fdx login` again.
 
 ## 5. Environment Variables
 
@@ -86,7 +86,7 @@ The CLI defaults to the production server. To point it at a different environmen
 **Option A — inline (one command):**
 
 ```bash
-FDX_MCP_SERVER=https://... fdx setup --device
+FDX_MCP_SERVER=https://... fdx login
 FDX_MCP_SERVER=https://... fdx call getMyInfo
 ```
 
@@ -94,7 +94,7 @@ FDX_MCP_SERVER=https://... fdx call getMyInfo
 
 ```bash
 export FDX_MCP_SERVER=https://...
-fdx setup --device
+fdx login
 fdx call getMyInfo
 ```
 
@@ -103,7 +103,7 @@ fdx call getMyInfo
 ```bash
 cp .env.example .env
 # edit .env and uncomment FDX_MCP_SERVER=https://...
-fdx setup --device
+fdx login
 ```
 
 The `.env` file is loaded automatically when the `fdx` binary starts. It is gitignored — do not commit it.
@@ -143,5 +143,5 @@ npm run lint:fix  # auto-fix
 | Problem                   | Fix                                                                           |
 | ------------------------- | ----------------------------------------------------------------------------- |
 | `fdx: command not found`  | Run `npm link` in the repo directory                                          |
-| Auth errors on `fdx call` | Run `fdx setup` to re-authenticate                                            |
-| Token expired             | Auto-refreshes via refresh token. If that also expired, run `fdx setup` again |
+| Auth errors on `fdx call` | Run `fdx login` to re-authenticate                                            |
+| Token expired             | Auto-refreshes via refresh token. If that also expired, run `fdx login` again |

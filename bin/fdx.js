@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('dotenv').config({ path: require('path').resolve(process.cwd(), '.env') });
+require('dotenv').config({ path: require('path').resolve(process.cwd(), '.env'), quiet: true });
 
 const { Command } = require('commander');
 const pc = require('picocolors');
@@ -64,12 +64,12 @@ program
 program
   .command('call')
   .description('Invoke an MCP tool')
-  .argument('<method>', 'tool name to invoke')
+  .argument('[method]', 'tool name to invoke')
   .allowUnknownOption()
   .allowExcessArguments(true)
   .passThroughOptions()
   .action(async (method, _opts, cmd) => {
-    await require('./commands/call')([method, ...cmd.args.slice(1)]);
+    await require('./commands/call')([method, ...cmd.args.slice(1)].filter(Boolean));
   });
 
 program.parseAsync().catch((error) => {

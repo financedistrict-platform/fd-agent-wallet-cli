@@ -9,10 +9,10 @@ describe('CLI method list sync', () => {
     const fs = require('fs');
     const path = require('path');
     const source = fs.readFileSync(path.join(__dirname, '../../bin/commands/call.js'), 'utf8');
-    const match = source.match(/const METHODS = \[([\s\S]*?)\];/);
-    assert.ok(match, 'Could not find METHODS array in call.js');
+    const match = source.match(/const METHOD_INFO = \{([\s\S]*?)\n\};/);
+    assert.ok(match, 'Could not find METHOD_INFO in call.js');
 
-    const cliMethods = match[1].match(/'([^']+)'/g).map((s) => s.replace(/'/g, ''));
+    const cliMethods = [...match[1].matchAll(/^\s{2}(\w+)\s*:/gm)].map((m) => m[1]);
 
     // Derive tool methods from WalletClient prototype — those that are not
     // inherited from Object, not constructor, and not lifecycle/auth helpers

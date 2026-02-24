@@ -56,7 +56,15 @@ class MCPClient {
   async callTool(toolName, args, retried = false) {
     if (!toolName) throw new Error('toolName is required');
 
-    logger.debug('mcp: calling tool', { tool: toolName, args });
+    // Strip undefined/null entries so the server only receives provided params
+    const cleanArgs = {};
+    for (const [key, value] of Object.entries(args || {})) {
+      if (value !== undefined && value !== null) {
+        cleanArgs[key] = value;
+      }
+    }
+
+    logger.debug('mcp: calling tool', { tool: toolName, args: cleanArgs });
 
     try {
       if (!this._client) {
@@ -67,11 +75,14 @@ class MCPClient {
 
       const result = await this._client.callTool({
         name: toolName,
-        arguments: args || {},
+        arguments: cleanArgs,
       });
 
       if (result.isError) {
-        const message = result.content?.[0]?.text || 'Tool returned an error';
+        const texts = (result.content || [])
+          .filter((c) => c.type === 'text' && c.text)
+          .map((c) => c.text);
+        const message = texts.join('\n') || 'Tool returned an error';
         logger.warn('mcp: tool returned error', { tool: toolName, message });
         return { error: { code: 'TOOL_ERROR', message } };
       }

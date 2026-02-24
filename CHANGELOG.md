@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-02-24
+
+### Added
+
+- `fdx call <method> --help` — shows required/optional parameters, types, descriptions, and usage example for each tool
+- `fdx call` (no method) now displays method descriptions and a hint to use `--help`
+- Unrecognized parameter warnings — CLI warns when you pass unknown flags (e.g. `--toAddress` instead of `--recipientAddress`)
+- Error context on failure — shows provided vs required parameters and a `--help` hint
+
+### Fixed
+
+- `MCPClient.callTool` now strips `undefined`/`null` values from arguments before sending to the MCP server, preventing silent failures from unset optional params
+- Improved error text extraction from MCP tool responses — concatenates all text content items instead of only the first
+
 ## [0.1.3] - 2026-02-23
 
 ### Added

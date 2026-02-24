@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-02-24
+
+### Added
+
+- `getTokenPrice` tool — look up current USD price and 24h change for any token
+- `resolveNameService` tool — resolve ENS (.eth), SNS (.sol), Unstoppable Domain names to addresses and vice versa
+- `skills/` git submodule pointing to `1stdigital/fd-agent-wallet-skills`
+- `docs/mcp-tools-schema.json` — reference copy of the MCP server tool schema
+
+### Changed
+
+- **BREAKING**: `transferTokens` params renamed: `recipientAddress` → `toAddress`, `tokenAddress` → `asset`, `amount` is now `number` type; removed `memo`, `maxPriorityFeePerGas`, `maxFeePerGas`; added `autoApprove`
+- **BREAKING**: `depositForYield` params renamed: `tokenAddress` → `token`; `fromAccountAddress` is now required
+- **BREAKING**: `withdrawFromYield` completely reworked: `positionId` → `vaultTokenAddress`, `amount` → `withdrawAmount`; added required `underlyingToken`, `fromAccountAddress`; removed `recipient`
+- **BREAKING**: `authorizePayment` completely reworked: replaced `url` and preference params with `paymentRequirementsResponseJson` and `autoApprove`
+- **BREAKING**: `getAccountActivity` params: `accountAddress` and `chainKey` now required; `limit`/`offset` replaced by `maxTransactions`
+- **BREAKING**: `discoverYieldStrategies` params renamed: `tokenAddress` → `token`; removed `minApy`, `maxRisk`; added `protocolSlug`, `sortDirection`, `limit`
+- `reportIssue` params: removed `severity`, `category`; added `labels`
+- `swapTokens` `amount` is now `number` type; added enum constraints for `objective` and `mode`
+
+### Removed
+
+- `deploySmartAccount` tool — no longer available on MCP server
+- `manageSmartAccountOwnership` tool — no longer available on MCP server
+
 ## [0.1.4] - 2026-02-24
 
 ### Added

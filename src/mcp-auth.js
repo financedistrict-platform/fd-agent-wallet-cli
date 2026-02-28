@@ -4,8 +4,15 @@ const defaultCredentialStore = require('./credential-store');
 const logger = require('./utils/logger');
 const { readStore, writeStore } = require('./storage');
 
+/**
+ * Entra External ID Native Authentication client.
+ *
+ * Sign-up: /signup/v1.0/start → /signup/v1.0/challenge → /signup/v1.0/continue → /oauth2/v2.0/token
+ * Sign-in: /oauth2/v2.0/initiate → /oauth2/v2.0/challenge → /oauth2/v2.0/token
+ */
+
 class MCPAuthClient {
-  constructor({ mcpServerUrl, storePath, httpClient, credentialStore }) {
+  constructor({ mcpServerUrl, storePath, httpClient, credentialStore, entraConfig }) {
     if (!mcpServerUrl) throw new Error('mcpServerUrl is required');
     if (!storePath) throw new Error('storePath is required');
 
@@ -22,203 +29,286 @@ class MCPAuthClient {
     this.storePath = storePath;
     this.httpClient = httpClient || axios.create();
     this._credentialStore = credentialStore || defaultCredentialStore;
-    this._initialized = false;
-    this._initPromise = null;
-    this._discovered = false;
-    this._discoveryPromise = null;
+
+    // Entra Native Auth configuration
+    const cfg = entraConfig || {};
+    this.entraAuthority = cfg.authority;
+    this.clientId = cfg.clientId;
+    this.scopes = cfg.scopes || 'openid offline_access';
+    this.challengeType = 'oob redirect';
   }
 
-  async initialize() {
-    if (this._initialized) return;
-    if (this._initPromise) return this._initPromise;
-    this._initPromise = this.#doInitialize();
-    try {
-      await this._initPromise;
-    } finally {
-      this._initPromise = null;
+  // ---------------------------------------------------------------------------
+  // Entra base URL
+  // ---------------------------------------------------------------------------
+  get #entraBaseUrl() {
+    if (!this.entraAuthority) {
+      throw new Error('Entra authority not configured.');
     }
+    return this.entraAuthority.replace(/\/$/, '');
   }
 
-  async #doInitialize() {
-    await this.#ensureDiscovered();
+  // ---------------------------------------------------------------------------
+  // Sign-up flow (register new principal)
+  // ---------------------------------------------------------------------------
 
-    // Cached discovery metadata may predate device-flow support on the server.
-    // Force a live re-discovery before giving up.
-    if (!this.deviceAuthorizationEndpoint) {
-      this._discovered = false;
-      const store = await this.#readStore();
-      if (store.mcpAuth) {
-        delete store.mcpAuth.oauthServerUrl;
-        await writeStore(store, this.storePath);
-      }
-      await this.#ensureDiscovered();
-    }
+  /**
+   * Step 1: Start sign-up — sends OTP to the given email.
+   * Returns { continuationToken }.
+   */
+  async startSignUp(email) {
+    if (!email) throw new Error('email is required');
+    if (!this.clientId) throw new Error('Entra client ID not configured');
 
-    if (!this.deviceAuthorizationEndpoint) {
-      throw new Error('Device authorization flow is not supported by this OAuth server');
-    }
-
-    const store = await this.#readStore();
-    const cached = store.mcpAuth;
-
-    // Support legacy stores that used deviceClientId
-    if (cached?.clientId || cached?.deviceClientId) {
-      this.clientId = cached.clientId || cached.deviceClientId;
-      this._initialized = true;
-      logger.debug('mcp-auth: using cached client', { clientId: this.clientId });
-      return;
-    }
-
-    if (this.registrationEndpoint) {
-      const { data: registration } = await this.httpClient.post(
-        this.registrationEndpoint,
-        {
-          client_name: 'FDX Wallet Client',
-          token_endpoint_auth_method: 'none',
-          grant_types: ['urn:ietf:params:oauth:grant-type:device_code'],
-          response_types: [],
-        },
-        {
-          headers: { 'Content-Type': 'application/json' },
-        },
-      );
-
-      this.clientId = registration.client_id;
-      await this.#persistMCPAuth({ clientId: this.clientId });
-      logger.info('mcp-auth: client registered', { clientId: this.clientId });
-    }
-
-    this._initialized = true;
-  }
-
-  async startDeviceFlow() {
-    await this.initialize();
-
+    const url = `${this.#entraBaseUrl}/signup/v1.0/start`;
     const payload = new URLSearchParams({
       client_id: this.clientId,
-      scope: 'openid offline_access api://fd-agent-wallet-mcp/mcp:tools',
+      challenge_type: this.challengeType,
+      username: email,
     });
 
-    const { data } = await this.httpClient.post(
-      this.deviceAuthorizationEndpoint,
-      payload.toString(),
-      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } },
-    );
+    logger.debug('mcp-auth: starting sign-up', { email });
+    const { data } = await this.httpClient.post(url, payload.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+
+    if (data.challenge_type === 'redirect') {
+      throw new Error('Entra requires browser-based authentication — native auth may not be enabled for this app');
+    }
+
+    logger.info('mcp-auth: sign-up started', { email });
+    return { continuationToken: data.continuation_token };
+  }
+
+  /**
+   * Step 2: Request OTP challenge for sign-up.
+   * Entra generates and emails the OTP code.
+   * Returns { continuationToken, codeLength, challengeTargetLabel }.
+   */
+  async challengeSignUp(continuationToken) {
+    if (!continuationToken) throw new Error('continuationToken is required');
+
+    const url = `${this.#entraBaseUrl}/signup/v1.0/challenge`;
+    const payload = new URLSearchParams({
+      client_id: this.clientId,
+      challenge_type: this.challengeType,
+      continuation_token: continuationToken,
+    });
+
+    const { data } = await this.httpClient.post(url, payload.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+
+    if (data.challenge_type === 'redirect') {
+      throw new Error('Entra requires browser-based authentication for this step');
+    }
+
+    logger.info('mcp-auth: sign-up OTP sent', {
+      channel: data.challenge_channel,
+      codeLength: data.code_length,
+    });
 
     return {
-      deviceCode: data.device_code,
-      userCode: data.user_code,
-      verificationUri: data.verification_uri,
-      verificationUriComplete: data.verification_uri_complete,
-      expiresIn: data.expires_in,
-      interval: data.interval || 5,
+      continuationToken: data.continuation_token,
+      codeLength: data.code_length,
+      challengeTargetLabel: data.challenge_target_label,
+      challengeChannel: data.challenge_channel,
+      interval: data.interval,
     };
   }
 
-  async pollDeviceToken({ deviceCode, interval = 5, expiresIn = 900 }) {
-    let pollIntervalMs = interval * 1000;
-    const deadline = Date.now() + expiresIn * 1000;
+  /**
+   * Step 3: Submit OTP to continue sign-up.
+   * Returns { continuationToken } for the token exchange step.
+   */
+  async continueSignUp(continuationToken, otpCode) {
+    if (!continuationToken) throw new Error('continuationToken is required');
+    if (!otpCode) throw new Error('otpCode is required');
 
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    const url = `${this.#entraBaseUrl}/signup/v1.0/continue`;
+    const payload = new URLSearchParams({
+      client_id: this.clientId,
+      continuation_token: continuationToken,
+      grant_type: 'oob',
+      oob: otpCode,
+    });
 
-      if (Date.now() >= deadline) {
-        throw new Error('Device flow code expired \u2014 please run "fdx login" again');
-      }
+    const { data } = await this.httpClient.post(url, payload.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
 
-      const payload = new URLSearchParams({
-        grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-        client_id: this.clientId,
-        device_code: deviceCode,
-      });
-
-      try {
-        const { data } = await this.httpClient.post(this.tokenEndpoint, payload.toString(), {
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        });
-
-        await this.#persistTokens(data);
-        logger.info('mcp-auth: token obtained via device flow', { server: this.mcpServerUrl });
-        return data;
-      } catch (err) {
-        const error = err.response?.data?.error;
-
-        if (error === 'authorization_pending') {
-          continue;
-        } else if (error === 'slow_down') {
-          pollIntervalMs += 5000;
-          continue;
-        } else if (error === 'access_denied') {
-          throw new Error('Device flow access denied by user');
-        } else if (error === 'expired_token') {
-          throw new Error('Device flow code expired \u2014 please run "fdx login" again');
-        } else {
-          throw err;
-        }
-      }
+    if (data.challenge_type === 'redirect') {
+      throw new Error('Entra requires browser-based authentication for this step');
     }
+
+    logger.info('mcp-auth: sign-up OTP verified');
+    return { continuationToken: data.continuation_token };
   }
+
+  /**
+   * Step 4: Exchange sign-up continuation token for OAuth tokens.
+   * Persists tokens locally.
+   */
+  async completeSignUp(continuationToken, email) {
+    if (!continuationToken) throw new Error('continuationToken is required');
+    if (!email) throw new Error('email is required');
+
+    const url = `${this.#entraBaseUrl}/oauth2/v2.0/token`;
+    const payload = new URLSearchParams({
+      client_id: this.clientId,
+      continuation_token: continuationToken,
+      grant_type: 'continuation_token',
+      scope: this.scopes,
+      username: email,
+    });
+
+    const { data } = await this.httpClient.post(url, payload.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+
+    await this.#persistTokens(data);
+    await this.#persistMCPAuth({ email });
+    logger.info('mcp-auth: sign-up complete — tokens obtained', { email });
+    return data;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sign-in flow (existing principal)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Step 1: Initiate sign-in — returns continuation token.
+   */
+  async startSignIn(email) {
+    if (!email) throw new Error('email is required');
+    if (!this.clientId) throw new Error('Entra client ID not configured');
+
+    const url = `${this.#entraBaseUrl}/oauth2/v2.0/initiate`;
+    const payload = new URLSearchParams({
+      client_id: this.clientId,
+      challenge_type: this.challengeType,
+      username: email,
+    });
+
+    logger.debug('mcp-auth: starting sign-in', { email });
+    const { data } = await this.httpClient.post(url, payload.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+
+    if (data.challenge_type === 'redirect') {
+      throw new Error('Entra requires browser-based authentication — native auth may not be enabled for this app');
+    }
+
+    logger.info('mcp-auth: sign-in initiated', { email });
+    return { continuationToken: data.continuation_token };
+  }
+
+  /**
+   * Step 2: Request OTP challenge for sign-in.
+   * Entra sends OTP to the user's email.
+   */
+  async challengeSignIn(continuationToken) {
+    if (!continuationToken) throw new Error('continuationToken is required');
+
+    const url = `${this.#entraBaseUrl}/oauth2/v2.0/challenge`;
+    const payload = new URLSearchParams({
+      client_id: this.clientId,
+      challenge_type: this.challengeType,
+      continuation_token: continuationToken,
+    });
+
+    const { data } = await this.httpClient.post(url, payload.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+
+    if (data.challenge_type === 'redirect') {
+      throw new Error('Entra requires browser-based authentication for this step');
+    }
+
+    logger.info('mcp-auth: sign-in OTP sent', {
+      channel: data.challenge_channel,
+      codeLength: data.code_length,
+    });
+
+    return {
+      continuationToken: data.continuation_token,
+      codeLength: data.code_length,
+      challengeTargetLabel: data.challenge_target_label,
+      challengeChannel: data.challenge_channel,
+    };
+  }
+
+  /**
+   * Step 3: Submit OTP and obtain tokens for sign-in.
+   * Persists tokens locally.
+   */
+  async completeSignIn(continuationToken, otpCode, email) {
+    if (!continuationToken) throw new Error('continuationToken is required');
+    if (!otpCode) throw new Error('otpCode is required');
+
+    const url = `${this.#entraBaseUrl}/oauth2/v2.0/token`;
+    const payload = new URLSearchParams({
+      client_id: this.clientId,
+      continuation_token: continuationToken,
+      grant_type: 'oob',
+      oob: otpCode,
+      scope: this.scopes,
+    });
+
+    const { data } = await this.httpClient.post(url, payload.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+
+    await this.#persistTokens(data);
+    await this.#persistMCPAuth({ email });
+    logger.info('mcp-auth: sign-in complete — tokens obtained', { email });
+    return data;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Token management (unchanged interface for MCPClient compatibility)
+  // ---------------------------------------------------------------------------
 
   async getAccessToken() {
     const tokens = await this.#getTokens();
     if (!tokens?.accessToken) {
-      throw new Error('No access token available');
+      throw new Error('No access token available — run "fdx login" or "fdx register" first');
     }
 
-    if (!tokens.expiresAt || Date.now() < tokens.expiresAt - 10000) {
-      return tokens.accessToken;
+    // Refresh proactively if expiring within 30 seconds
+    if (tokens.expiresAt && Date.now() >= tokens.expiresAt - 30_000) {
+      return this.refreshToken();
     }
 
-    return this.refreshToken();
+    return tokens.accessToken;
   }
 
   async refreshToken() {
-    await this.#ensureDiscovered();
-
-    // Load client ID from store if not already in memory
     if (!this.clientId) {
-      const store = await this.#readStore();
-      this.clientId = store.mcpAuth?.clientId || store.mcpAuth?.deviceClientId || null;
-    }
-
-    if (!this.clientId) {
-      throw new Error('No client ID available \u2014 run "fdx login" first');
+      throw new Error('No client ID available — Entra client ID not configured');
     }
 
     const tokens = await this.#getTokens();
     if (!tokens?.refreshToken) {
-      const error = new Error('No refresh token available \u2014 run "fdx login" to re-authenticate');
-      error.code = 'SESSION_EXPIRED';
-      throw error;
+      throw new Error('No refresh token available — run "fdx login" to re-authenticate');
     }
 
-    logger.debug('mcp-auth: refreshing access token', { server: this.mcpServerUrl });
+    logger.debug('mcp-auth: refreshing access token');
 
+    const url = `${this.#entraBaseUrl}/oauth2/v2.0/token`;
     const payload = new URLSearchParams({
       grant_type: 'refresh_token',
       refresh_token: tokens.refreshToken,
       client_id: this.clientId,
+      scope: this.scopes,
     });
 
-    let data;
-    try {
-      ({ data } = await this.httpClient.post(this.tokenEndpoint, payload.toString(), {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      }));
-    } catch (err) {
-      const oauthError = err.response?.data?.error;
-      if (oauthError === 'invalid_grant' || oauthError === 'interaction_required') {
-        logger.warn('mcp-auth: refresh token rejected by server', { error: oauthError });
-        const error = new Error('Session expired \u2014 run "fdx login" to re-authenticate');
-        error.code = 'SESSION_EXPIRED';
-        throw error;
-      }
-      throw err;
-    }
+    const { data } = await this.httpClient.post(url, payload.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
 
-    await this.#persistTokens({ ...tokens, ...data });
-    logger.info('mcp-auth: access token refreshed', { server: this.mcpServerUrl });
+    await this.#persistTokens(data);
+    logger.info('mcp-auth: access token refreshed');
     return data.access_token;
   }
 
@@ -236,132 +326,30 @@ class MCPAuthClient {
       expired: tokens?.expiresAt ? Date.now() >= tokens.expiresAt : false,
       hasRefresh: !!tokens?.refreshToken,
       expiresAt: tokens?.expiresAt,
-      clientId: store.mcpAuth?.clientId || store.mcpAuth?.deviceClientId,
+      email: store.mcpAuth?.email,
       usingCredentialStore: !!store.tokens?.credentialStore,
     };
   }
 
   async logout() {
     this._credentialStore.deleteSecret(this.#credentialAccount());
+    this._credentialStore.deleteSecret(this.#pendingCredentialAccount());
 
     const store = await this.#readStore();
     delete store.tokens;
+    delete store.mcpAuth;
+    delete store.pendingVerification;
     await writeStore(store, this.storePath);
-
-    this._initialized = false;
-    this._discovered = false;
 
     logger.info('mcp-auth: logged out', { server: this.mcpServerUrl });
   }
 
-  #requireHttps(url, label) {
-    let parsed;
-    try {
-      parsed = new URL(url);
-    } catch {
-      throw new Error(`Invalid ${label} URL: ${url}`);
-    }
-    if (
-      parsed.protocol !== 'https:' &&
-      parsed.hostname !== 'localhost' &&
-      parsed.hostname !== '127.0.0.1'
-    ) {
-      throw new Error(`${label} must use HTTPS: ${url}`);
-    }
-  }
-
-  #validateDiscoveredEndpoints() {
-    this.#requireHttps(this.oauthServerUrl, 'authorization_server');
-    this.#requireHttps(this.tokenEndpoint, 'token_endpoint');
-    if (this.registrationEndpoint) {
-      this.#requireHttps(this.registrationEndpoint, 'registration_endpoint');
-    }
-    if (this.deviceAuthorizationEndpoint) {
-      this.#requireHttps(this.deviceAuthorizationEndpoint, 'device_authorization_endpoint');
-    }
-  }
+  // ---------------------------------------------------------------------------
+  // Private helpers
+  // ---------------------------------------------------------------------------
 
   #credentialAccount() {
     return new URL(this.mcpServerUrl).host;
-  }
-
-  async #ensureDiscovered() {
-    if (this._discovered) return;
-    if (this._discoveryPromise) return this._discoveryPromise;
-    this._discoveryPromise = this.#doDiscover();
-    try {
-      await this._discoveryPromise;
-    } finally {
-      this._discoveryPromise = null;
-    }
-  }
-
-  async #doDiscover() {
-    const store = await this.#readStore();
-    const cached = store.mcpAuth;
-
-    if (cached?.oauthServerUrl && cached?.tokenEndpoint) {
-      this.oauthServerUrl = cached.oauthServerUrl;
-      this.tokenEndpoint = cached.tokenEndpoint;
-      this.registrationEndpoint = cached.registrationEndpoint;
-      this.deviceAuthorizationEndpoint = cached.deviceAuthorizationEndpoint;
-      this.#validateDiscoveredEndpoints();
-      this._discovered = true;
-      logger.debug('mcp-auth: using cached OAuth discovery', { server: this.oauthServerUrl });
-      return;
-    }
-
-    const protectedResourceUrl = `${this.mcpServerUrl}/.well-known/oauth-protected-resource`;
-    const { data: protectedResource } = await this.httpClient.get(protectedResourceUrl);
-
-    const server = protectedResource.authorization_servers?.[0];
-    if (!server) {
-      throw new Error('No authorization server found in protected resource metadata');
-    }
-    this.oauthServerUrl = server;
-    logger.info('mcp-auth: OAuth server discovered', { server: this.oauthServerUrl });
-    const metadata = await this.#discoverMetadata(this.oauthServerUrl);
-
-    this.tokenEndpoint = metadata.token_endpoint;
-    this.registrationEndpoint = metadata.registration_endpoint;
-    this.deviceAuthorizationEndpoint = metadata.device_authorization_endpoint;
-    this.#validateDiscoveredEndpoints();
-
-    await this.#persistMCPAuth({
-      oauthServerUrl: this.oauthServerUrl,
-      tokenEndpoint: this.tokenEndpoint,
-      registrationEndpoint: this.registrationEndpoint,
-      deviceAuthorizationEndpoint: this.deviceAuthorizationEndpoint,
-    });
-
-    this._discovered = true;
-  }
-
-  async #discoverMetadata(oauthServerUrl) {
-    const rfc8414Url = `${oauthServerUrl}/.well-known/oauth-authorization-server`;
-    let rfc8414Data;
-    try {
-      const { data } = await this.httpClient.get(rfc8414Url);
-      if (data?.token_endpoint) rfc8414Data = data;
-    } catch {
-      // not found - try OIDC
-    }
-
-    if (rfc8414Data?.device_authorization_endpoint) {
-      return rfc8414Data;
-    }
-
-    const oidcUrl = `${oauthServerUrl}/.well-known/openid-configuration`;
-    try {
-      const { data } = await this.httpClient.get(oidcUrl);
-      if (rfc8414Data) {
-        return { ...data, ...rfc8414Data, device_authorization_endpoint: data.device_authorization_endpoint || rfc8414Data.device_authorization_endpoint };
-      }
-      return data;
-    } catch {
-      if (rfc8414Data) return rfc8414Data;
-      throw new Error(`OAuth metadata discovery failed for ${oauthServerUrl}`);
-    }
   }
 
   async #getTokens() {
@@ -391,8 +379,17 @@ class MCPAuthClient {
     const store = await this.#readStore();
     const expiresInMs = (tokenResponse.expires_in || 0) * 1000;
     const accessToken = tokenResponse.access_token;
-    const refreshToken =
-      tokenResponse.refresh_token || tokenResponse.refreshToken || store.tokens?.refreshToken;
+
+    // Preserve existing refresh token: check response first, then current tokens
+    let refreshToken = tokenResponse.refresh_token || tokenResponse.refreshToken;
+    if (!refreshToken) {
+      try {
+        const current = await this.#getTokens();
+        refreshToken = current?.refreshToken;
+      } catch {
+        // Credential store unavailable — nothing to preserve
+      }
+    }
 
     const stored = this._credentialStore.setSecret(
       this.#credentialAccount(),
@@ -423,6 +420,49 @@ class MCPAuthClient {
     const store = await this.#readStore();
     store.mcpAuth = { ...store.mcpAuth, ...mcpAuth };
     await writeStore(store, this.storePath);
+  }
+
+  async savePendingVerification({ continuationToken, email, flow }) {
+    // Store continuation token in OS credential store (sensitive)
+    const account = this.#pendingCredentialAccount();
+    const stored = this._credentialStore.setSecret(account, continuationToken);
+
+    const store = await this.#readStore();
+    store.pendingVerification = { email, flow, createdAt: Date.now() };
+    if (!stored) {
+      // Fallback: store in state file if credential store unavailable
+      store.pendingVerification.continuationToken = continuationToken;
+    } else {
+      store.pendingVerification.credentialStore = true;
+    }
+    await writeStore(store, this.storePath);
+  }
+
+  async getPendingVerification() {
+    const store = await this.#readStore();
+    const pending = store.pendingVerification;
+    if (!pending) return null;
+
+    let continuationToken;
+    if (pending.credentialStore) {
+      continuationToken = this._credentialStore.getSecret(this.#pendingCredentialAccount());
+    } else {
+      continuationToken = pending.continuationToken;
+    }
+
+    if (!continuationToken) return null;
+    return { continuationToken, email: pending.email, flow: pending.flow };
+  }
+
+  async clearPendingVerification() {
+    this._credentialStore.deleteSecret(this.#pendingCredentialAccount());
+    const store = await this.#readStore();
+    delete store.pendingVerification;
+    await writeStore(store, this.storePath);
+  }
+
+  #pendingCredentialAccount() {
+    return `${new URL(this.mcpServerUrl).host}/pending`;
   }
 
   async #readStore() {

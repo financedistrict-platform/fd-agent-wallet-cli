@@ -18,33 +18,38 @@ program
     'after',
     [
       '',
-      `${pc.dim('Environment:')}`,
-      `  FDX_MCP_SERVER     MCP server URL (default: https://mcp.fd.xyz)`,
-      `  FDX_STORE_PATH     Token store path (default: ~/.fdx/auth.json)`,
-      `  FDX_LOG_PATH       Log file path (default: ~/.fdx/fdx.log)`,
-      `  FDX_LOG_LEVEL      Log verbosity: debug|info|warn|error|off (default: info)`,
+      `${pc.dim('Environment (optional overrides):')}`,
+      `  FDX_MCP_SERVER              MCP server URL (default: https://mcp.fd.xyz)`,
+      `  FDX_STORE_PATH              Token store path (default: ~/.fdx/auth.json)`,
+      `  FDX_LOG_PATH                Log file path (default: ~/.fdx/fdx.log)`,
+      `  FDX_LOG_LEVEL               Log verbosity: debug|info|warn|error|off (default: info)`,
     ].join('\n'),
   );
 
 program
+  .command('register')
+  .description('Register a new account (sends email OTP)')
+  .requiredOption('--email <email>', 'Email address for the new account')
+  .action(async (opts) => {
+    await require('./commands/register')(opts);
+  });
+
+program
   .command('login')
-  .description('Authenticate via OAuth 2.1 device authorization flow')
-  .action(async () => {
-    await require('./commands/login')();
+  .description('Sign in to an existing account (sends email OTP)')
+  .requiredOption('--email <email>', 'Email address of the account')
+  .action(async (opts) => {
+    await require('./commands/login')(opts);
   });
 
 program
-  .command('signup')
-  .description('Open the Finance District sign-up page')
-  .action(async () => {
-    await require('./commands/signup')();
-  });
-
-program
-  .command('setup', { hidden: true })
-  .description('Alias for "login" (deprecated)')
-  .action(async () => {
-    await require('./commands/login')();
+  .command('verify')
+  .description('Complete registration or login by submitting the OTP code')
+  .requiredOption('--code <code>', 'OTP code received via email')
+  .action(async (opts) => {
+    await require('./commands/verify')({
+      code: opts.code,
+    });
   });
 
 program

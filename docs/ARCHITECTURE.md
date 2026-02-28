@@ -19,7 +19,9 @@ FDX is a three-layer system that gives AI agents secure access to blockchain wal
 │  ┌─────────────────┐                                               │
 │  │  CLI Commands   │                                               │
 │  │                 │                                               │
+│  │  • fdx register │                                               │
 │  │  • fdx login    │                                               │
+│  │  • fdx verify   │                                               │
 │  │  • fdx status   │                                               │
 │  │  • fdx call     │                                               │
 │  │    <method>     │                                               │
@@ -27,13 +29,13 @@ FDX is a three-layer system that gives AI agents secure access to blockchain wal
 │                                                                     │
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │              WalletClient (SDK)                              │  │
-│  │  • OAuth 2.1 + DCR + Device Code authentication                    │  │
+│  │  • Email OTP authentication via Entra Native Auth               │  │
 │  │  • JSON-RPC 2.0 MCP protocol client                         │  │
 │  │  • High-level methods for wallet/DeFi operations             │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 └────────────────────────────────┬────────────────────────────────────┘
                                  │
-                                 │ HTTPS + OAuth 2.1
+                                 │ HTTPS + Bearer token
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    Finance District MCP Server                      │
@@ -63,7 +65,7 @@ The npm package includes:
 
 - **CLI Tool** (`bin/fdx.js`): Command-line interface for setup, status checks, and method invocation
 - **SDK** (`src/wallet-client.js`): High-level JavaScript API with typed methods for each MCP tool
-- **OAuth Client** (`src/mcp-auth.js`): RFC 7591 Dynamic Client Registration with Device Authorization Grant (RFC 8628)
+- **OAuth Client** (`src/mcp-auth.js`): Entra External ID Native Authentication — headless email OTP sign-up and sign-in
 - **MCP Client** (`src/mcp-client.js`): JSON-RPC 2.0 protocol handler with SSE response format
 
 ### 2. Finance District MCP Server
@@ -91,14 +93,22 @@ The remote server (hosted at fd.xyz) provides:
 
 ## Authentication Flow
 
-### First-Time Login (`fdx login`)
+### First-Time Registration (`fdx register`)
 
-1. **Discover OAuth server**: Fetch protected-resource and authorization-server metadata
-2. **Register OAuth client**: POST to `/oauth/register` (RFC 7591 DCR) with device_code grant
-3. **Start device flow**: Request device code from authorization server
-4. **User authenticates**: User opens verification URL and enters code on any device
-5. **Poll for token**: CLI polls token endpoint until user completes authorization
-6. **Store tokens**: Save to `~/.fdx/auth.json` (secrets in OS credential store)
+1. **Start sign-up**: POST email to Entra `/signup/v1.0/start`
+2. **Request OTP challenge**: POST to `/signup/v1.0/challenge` with `challenge_type=oob`
+3. **User enters OTP**: 8-digit code delivered via email
+4. **Submit OTP**: POST to `/signup/v1.0/continue` with the OTP
+5. **Exchange for tokens**: POST to `/oauth2/v2.0/token` with grant_continuation_token
+6. **Store tokens**: Save to OS credential store (fallback: `~/.fdx/auth.json`)
+
+### Sign-In (`fdx login`)
+
+1. **Start sign-in**: POST email to Entra `/oauth2/v2.0/initiate`
+2. **Request OTP challenge**: POST to `/oauth2/v2.0/challenge` with `challenge_type=oob`
+3. **User enters OTP via `fdx verify`**: 8-digit code from email
+4. **Exchange for tokens**: POST to `/oauth2/v2.0/token` with OTP + continuation_token
+5. **Store tokens**: Save to OS credential store
 
 ### Subsequent Requests
 
@@ -112,9 +122,10 @@ No private keys, no seed phrases. All wallet operations are server-side with use
 ## Security Model
 
 - **No Local Keys**: Agent never touches private keys. Wallets are managed server-side.
-- **OAuth 2.1**: Industry-standard authentication with Device Authorization Grant.
-- **Consent-Based**: User authorizes agent via web browser on first setup.
+- **Email OTP**: Passwordless authentication via Entra External ID Native Auth.
+- **Headless Flow**: No browser required — works in containers, CI/CD, remote servers.
 - **Token Refresh**: Long-lived refresh tokens minimize re-authentication.
+- **OS Credential Store**: Tokens stored in macOS Keychain, Linux libsecret, or Windows DPAPI.
 - **Smart Accounts**: ERC-4337 account abstraction allows multi-signature, recovery, upgradability.
 - **Audit Trail**: All transactions are recorded on-chain with transparent history.
 

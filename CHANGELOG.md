@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-02-28
+
+### Fixed
+
+- Spinner and checkmark characters render as garbled text on Windows PowerShell — now uses ASCII frames (`| / - \`) and marks (`+`, `x`) on Windows
+
+## [0.3.0] - 2026-02-28
+
+### Added
+
+- **Email OTP authentication** — fully headless sign-in and registration via email one-time passcode; no browser required
+- `fdx register --email <email>` — start a new account registration with email OTP
+- `fdx login --email <email>` — sign in to an existing account with email OTP
+- `fdx verify --code <OTP>` — complete registration or login by submitting the 8-digit code from email
+- Pending verification state stored in OS credential store — continuation tokens survive between CLI invocations
+- Automatic token refresh — expired access tokens are refreshed transparently using the stored refresh token
+- ASCII spinner for Windows — spinner frames and checkmarks render cleanly in PowerShell (no garbled Unicode)
+
+### Changed
+
+- **BREAKING**: Replaced Device Authorization Grant (RFC 8628) with Entra Native Authentication email OTP as the sole authentication method
+- **BREAKING**: Removed `fdx setup` and `fdx signup` commands — replaced by `fdx register`, `fdx login`, `fdx verify`
+- **BREAKING**: Auth configuration (authority, client ID, scopes) is now baked in at build time — `FDX_ENTRA_AUTHORITY`, `FDX_ENTRA_CLIENT_ID`, `FDX_ENTRA_SCOPES`, `FDX_TENANT_SUBDOMAIN` environment variables no longer have any effect
+- **BREAKING**: Removed `MCPAuthClient` methods: `discoverEndpoints()`, `startDeviceAuthorization()`, `pollDeviceToken()`, `getAuthorizationUrl()`, `exchangeCodeForToken()`
+- **BREAKING**: `WalletClient` constructor now requires `authConfig` object (`{ authority, clientId, scopes }`) instead of OAuth discovery parameters
+
+### Removed
+
+- Device Authorization Grant flow and all OAuth 2.0 discovery logic (RFC 8414, protected resource metadata)
+- `fdx setup` command (previously aliased to `fdx login`)
+- `fdx signup` command (browser-based registration redirect)
+- `skills/` git submodule — skills now live in a separate repository
+
 ## [0.2.2] - 2026-02-24
 
 ### Added
@@ -122,9 +155,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- CLI commands: `fdx setup`, `fdx status`, `fdx call <method>`
-- OAuth 2.1 authentication with PKCE and Dynamic Client Registration (RFC 7591)
+- CLI commands: `fdx register`, `fdx login`, `fdx verify`, `fdx status`, `fdx call <method>`, `fdx logout`
+- Email OTP authentication via Entra External ID Native Authentication
 - WalletClient SDK with methods for wallet, transfer, swap, and yield operations
 - Multi-chain support: Ethereum, BSC, Arbitrum, Base, Solana
 - JSON output for agent-friendly parsing
 - Token auto-refresh on expiry
+- OS credential store integration (macOS Keychain, Linux libsecret, Windows DPAPI)

@@ -18,11 +18,12 @@ describe('CLI method list sync', () => {
     // inherited from Object, not constructor, and not lifecycle/auth helpers
     const skip = new Set([
       'constructor',
-      'initialize',
+      'register',
+      'verifyRegistration',
+      'login',
+      'verifyLogin',
       'getTokenState',
       'logout',
-      'startDeviceFlow',
-      'pollDeviceToken',
       'listTools',
       'close',
     ]);

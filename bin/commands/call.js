@@ -1,4 +1,4 @@
-const { createSpinner } = require('nanospinner');
+const createSpinner = require('./spinner');
 const pc = require('picocolors');
 
 const { createClientFromEnv } = require('../../src');

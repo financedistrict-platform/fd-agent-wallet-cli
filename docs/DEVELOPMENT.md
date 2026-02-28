@@ -8,7 +8,6 @@ Step-by-step instructions to set up FDX for local development on any machine.
 
 - Node.js >= 18
 - Git
-- A browser for the OAuth consent flow
 
 ---
 
@@ -32,30 +31,21 @@ Verify the `fdx` command is available:
 fdx
 ```
 
-Should print usage info with `login`, `signup`, `status`, `call` commands.
+Should print usage info with `register`, `login`, `verify`, `status`, `call` commands.
 
-## 3. Run login
+## 3. Register and authenticate
 
 ```bash
-fdx login
+fdx register --email you@example.com
+# Check your email for an 8-digit OTP
+fdx verify --code 12345678
 ```
 
 This will:
 
-- Discover the OAuth server
-- Register a client dynamically (first time only)
-- Print an authorization URL — open it in your browser
-- Wait for the OAuth callback on `localhost:6260`
-- Exchange the code for tokens
-- Write tokens to `~/.fdx/auth.json`
-
-If the machine is headless and you can't open a browser, run `fdx login` on your local machine instead, then copy the token file:
-
-```bash
-# From local machine
-scp ~/.fdx/auth.json user@server:~/.fdx/auth.json
-ssh user@server "chmod 600 ~/.fdx/auth.json"
-```
+- Send a one-time passcode to your email via Entra External ID
+- Exchange the OTP for access and refresh tokens
+- Store tokens in the OS credential store (fallback: `~/.fdx/auth.json`)
 
 ## 4. Verify the CLI works
 
@@ -65,17 +55,18 @@ fdx call getMyInfo
 fdx call getAppVersion
 ```
 
-All three should return data. If `fdx call` fails with auth errors, run `fdx login` again.
+All three should return data. If `fdx call` fails with auth errors, run `fdx login --email you@example.com` and `fdx verify --code <OTP>` again.
 
 ## 5. Environment Variables
 
 | Variable           | Description        | Default                                |
 | ------------------ | ------------------ | -------------------------------------- |
 | `FDX_MCP_SERVER`   | MCP server URL     | `https://mcp.fd.xyz`                   |
-| `FDX_REDIRECT_URI` | OAuth callback URI | `http://localhost:6260/oauth/callback` |
 | `FDX_STORE_PATH`   | Token store path   | `~/.fdx/auth.json`                     |
 | `FDX_LOG_PATH`     | Log file path      | `~/.fdx/fdx.log`                       |
 | `FDX_LOG_LEVEL`    | Log verbosity (`debug`\|`info`\|`warn`\|`error`\|`off`) | `info` |
+
+Entra authentication configuration (authority, client ID, scopes) is baked into the package at build time and cannot be overridden at runtime.
 
 You can set these inline before a command, as persistent shell exports, or via a `.env` file in the working directory (see `.env.example`). The `.env` file is gitignored so values never end up in the repository.
 
@@ -86,7 +77,7 @@ The CLI defaults to the production server. To point it at a different environmen
 **Option A — inline (one command):**
 
 ```bash
-FDX_MCP_SERVER=https://... fdx login
+FDX_MCP_SERVER=https://... fdx login --email you@example.com
 FDX_MCP_SERVER=https://... fdx call getMyInfo
 ```
 
@@ -94,7 +85,7 @@ FDX_MCP_SERVER=https://... fdx call getMyInfo
 
 ```bash
 export FDX_MCP_SERVER=https://...
-fdx login
+fdx login --email you@example.com
 fdx call getMyInfo
 ```
 
@@ -103,7 +94,7 @@ fdx call getMyInfo
 ```bash
 cp .env.example .env
 # edit .env and uncomment FDX_MCP_SERVER=https://...
-fdx login
+fdx login --email you@example.com
 ```
 
 The `.env` file is loaded automatically when the `fdx` binary starts. It is gitignored — do not commit it.
@@ -140,8 +131,8 @@ npm run lint:fix  # auto-fix
 
 ## Troubleshooting
 
-| Problem                   | Fix                                                                           |
-| ------------------------- | ----------------------------------------------------------------------------- |
-| `fdx: command not found`  | Run `npm link` in the repo directory                                          |
-| Auth errors on `fdx call` | Run `fdx login` to re-authenticate                                            |
-| Token expired             | Auto-refreshes via refresh token. If that also expired, run `fdx login` again |
+| Problem                   | Fix                                                                                |
+| ------------------------- | ---------------------------------------------------------------------------------- |
+| `fdx: command not found`  | Run `npm link` in the repo directory                                               |
+| Auth errors on `fdx call` | Run `fdx login --email you@example.com` then `fdx verify --code <OTP>`             |
+| Token expired             | Auto-refreshes via refresh token. If that also expired, run `fdx login` again      |

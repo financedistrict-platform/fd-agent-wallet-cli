@@ -3,7 +3,7 @@ const pc = require('picocolors');
 
 const { createClientFromEnv } = require('../../src');
 
-module.exports = async function login({ email }) {
+module.exports = async function register({ email }) {
   if (!email) {
     console.error(pc.red('--email is required'));
     process.exit(1);
@@ -11,19 +11,19 @@ module.exports = async function login({ email }) {
 
   const client = createClientFromEnv();
 
-  console.log(pc.bold('FDX - Login'));
+  console.log(pc.bold('FDX - Register'));
   console.log('');
   console.log(`${pc.dim('Email:')}       ${email}`);
   console.log(`${pc.dim('MCP Server:')} ${client.authClient.mcpServerUrl}`);
   console.log('');
 
-  const spinner = createSpinner('Requesting verification code...').start();
+  const spinner = createSpinner('Starting registration...').start();
 
   let challenge;
   try {
-    challenge = await client.login(email);
+    challenge = await client.register(email);
   } catch (err) {
-    spinner.error({ text: 'Login failed' });
+    spinner.error({ text: 'Registration failed' });
     if (err.response?.data) {
       const d = err.response.data;
       console.error(`\n  ${pc.red('Error:')}   ${d.error || 'unknown'}`);

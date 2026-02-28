@@ -66,10 +66,11 @@ describe('WalletClient', () => {
 
     it('discoverYieldStrategies should forward params', async () => {
       const { client, calls } = createClient();
-      await client.discoverYieldStrategies({ chainKey: 'base', minApy: 5 });
+      await client.discoverYieldStrategies({ chainKey: 'base', token: 'USDC', protocolSlug: 'aave-v3' });
       assert.strictEqual(calls[0].toolName, 'discoverYieldStrategies');
       assert.strictEqual(calls[0].args.chainKey, 'base');
-      assert.strictEqual(calls[0].args.minApy, 5);
+      assert.strictEqual(calls[0].args.token, 'USDC');
+      assert.strictEqual(calls[0].args.protocolSlug, 'aave-v3');
     });
   });
 
@@ -96,37 +97,64 @@ describe('WalletClient', () => {
       await assert.rejects(() => client.reportIssue({ title: 'Bug' }), /description is required/);
     });
 
-    it('deploySmartAccount should throw if chainKey is missing', async () => {
+    it('getTokenPrice should throw if token is missing', async () => {
       const { client } = createClient();
-      await assert.rejects(() => client.deploySmartAccount({}), /chainKey is required/);
+      await assert.rejects(() => client.getTokenPrice({}), /token is required/);
+    });
+
+    it('getTokenPrice should call tool with params', async () => {
+      const { client, calls } = createClient();
+      await client.getTokenPrice({ token: 'ETH' });
+      assert.strictEqual(calls[0].toolName, 'getTokenPrice');
+      assert.strictEqual(calls[0].args.token, 'ETH');
+    });
+
+    it('resolveNameService should throw if nameOrAddress is missing', async () => {
+      const { client } = createClient();
+      await assert.rejects(() => client.resolveNameService({}), /nameOrAddress is required/);
+    });
+
+    it('resolveNameService should call tool with params', async () => {
+      const { client, calls } = createClient();
+      await client.resolveNameService({ nameOrAddress: 'vitalik.eth' });
+      assert.strictEqual(calls[0].toolName, 'resolveNameService');
+      assert.strictEqual(calls[0].args.nameOrAddress, 'vitalik.eth');
     });
 
     it('transferTokens should validate required fields', async () => {
       const { client } = createClient();
-      await assert.rejects(() => client.transferTokens({}), /chainKey is required/);
+      await assert.rejects(() => client.transferTokens({}), /toAddress is required/);
       await assert.rejects(
-        () => client.transferTokens({ chainKey: 'ethereum' }),
-        /recipientAddress is required/,
+        () => client.transferTokens({ toAddress: '0x1' }),
+        /amount is required/,
       );
       await assert.rejects(
-        () => client.transferTokens({ chainKey: 'ethereum', recipientAddress: '0x1' }),
-        /amount is required/,
+        () => client.transferTokens({ toAddress: '0x1', amount: 1 }),
+        /asset is required/,
+      );
+      await assert.rejects(
+        () => client.transferTokens({ toAddress: '0x1', amount: 1, asset: 'ETH' }),
+        /chainKey is required/,
       );
     });
 
     it('transferTokens should call tool with all params', async () => {
       const { client, calls } = createClient();
       await client.transferTokens({
+        toAddress: '0xABC',
+        amount: 1.5,
+        asset: 'USDC',
         chainKey: 'ethereum',
-        recipientAddress: '0xABC',
-        amount: '1.5',
-        tokenAddress: '0xTOKEN',
+        fromAccountAddress: '0xSRC',
+        autoApprove: true,
       });
       assert.strictEqual(calls[0].toolName, 'transferTokens');
+      assert.strictEqual(calls[0].args.toAddress, '0xABC');
+      assert.strictEqual(calls[0].args.amount, 1.5);
+      assert.strictEqual(calls[0].args.asset, 'USDC');
       assert.strictEqual(calls[0].args.chainKey, 'ethereum');
-      assert.strictEqual(calls[0].args.recipientAddress, '0xABC');
-      assert.strictEqual(calls[0].args.amount, '1.5');
-      assert.strictEqual(calls[0].args.tokenAddress, '0xTOKEN');
+      assert.strictEqual(calls[0].args.fromAccountAddress, '0xSRC');
+      assert.strictEqual(calls[0].args.autoApprove, true);
     });
 
     it('swapTokens should validate required fields', async () => {
@@ -135,9 +163,28 @@ describe('WalletClient', () => {
       await assert.rejects(() => client.swapTokens({ chainKey: 'base' }), /tokenIn is required/);
     });
 
-    it('authorizePayment should throw if url is missing', async () => {
+    it('authorizePayment should throw if paymentRequirementsResponseJson is missing', async () => {
       const { client } = createClient();
-      await assert.rejects(() => client.authorizePayment({}), /url is required/);
+      await assert.rejects(
+        () => client.authorizePayment({}),
+        /paymentRequirementsResponseJson is required/,
+      );
+    });
+
+    it('authorizePayment should call tool with params', async () => {
+      const { client, calls } = createClient();
+      await client.authorizePayment({ paymentRequirementsResponseJson: '{"test":true}' });
+      assert.strictEqual(calls[0].toolName, 'authorizePayment');
+      assert.strictEqual(calls[0].args.paymentRequirementsResponseJson, '{"test":true}');
+    });
+
+    it('getAccountActivity should validate required fields', async () => {
+      const { client } = createClient();
+      await assert.rejects(() => client.getAccountActivity({}), /accountAddress is required/);
+      await assert.rejects(
+        () => client.getAccountActivity({ accountAddress: '0x1' }),
+        /chainKey is required/,
+      );
     });
 
     it('getX402Content should throw if url is missing', async () => {
@@ -147,20 +194,78 @@ describe('WalletClient', () => {
 
     it('depositForYield should validate required fields', async () => {
       const { client } = createClient();
-      await assert.rejects(() => client.depositForYield({}), /chainKey is required/);
+      await assert.rejects(() => client.depositForYield({}), /strategyId is required/);
       await assert.rejects(
-        () => client.depositForYield({ chainKey: 'base' }),
-        /strategyId is required/,
+        () => client.depositForYield({ strategyId: 'aave-usdc' }),
+        /fromAccountAddress is required/,
       );
+      await assert.rejects(
+        () => client.depositForYield({ strategyId: 'aave-usdc', fromAccountAddress: '0x1' }),
+        /token is required/,
+      );
+      await assert.rejects(
+        () => client.depositForYield({ strategyId: 'aave-usdc', fromAccountAddress: '0x1', token: 'USDC' }),
+        /amount is required/,
+      );
+      await assert.rejects(
+        () => client.depositForYield({ strategyId: 'aave-usdc', fromAccountAddress: '0x1', token: 'USDC', amount: 10 }),
+        /chainKey is required/,
+      );
+    });
+
+    it('depositForYield should call tool with all params', async () => {
+      const { client, calls } = createClient();
+      await client.depositForYield({
+        strategyId: 'aave-usdc',
+        fromAccountAddress: '0x1',
+        token: 'USDC',
+        amount: 100,
+        chainKey: 'base',
+      });
+      assert.strictEqual(calls[0].toolName, 'depositForYield');
+      assert.strictEqual(calls[0].args.strategyId, 'aave-usdc');
+      assert.strictEqual(calls[0].args.fromAccountAddress, '0x1');
+      assert.strictEqual(calls[0].args.token, 'USDC');
+      assert.strictEqual(calls[0].args.amount, 100);
+      assert.strictEqual(calls[0].args.chainKey, 'base');
     });
 
     it('withdrawFromYield should validate required fields', async () => {
       const { client } = createClient();
-      await assert.rejects(() => client.withdrawFromYield({}), /chainKey is required/);
+      await assert.rejects(() => client.withdrawFromYield({}), /vaultTokenAddress is required/);
       await assert.rejects(
-        () => client.withdrawFromYield({ chainKey: 'base' }),
-        /positionId is required/,
+        () => client.withdrawFromYield({ vaultTokenAddress: '0xVAULT' }),
+        /underlyingToken is required/,
       );
+      await assert.rejects(
+        () => client.withdrawFromYield({ vaultTokenAddress: '0xVAULT', underlyingToken: 'USDC' }),
+        /withdrawAmount is required/,
+      );
+      await assert.rejects(
+        () => client.withdrawFromYield({ vaultTokenAddress: '0xVAULT', underlyingToken: 'USDC', withdrawAmount: 50 }),
+        /fromAccountAddress is required/,
+      );
+      await assert.rejects(
+        () => client.withdrawFromYield({ vaultTokenAddress: '0xVAULT', underlyingToken: 'USDC', withdrawAmount: 50, fromAccountAddress: '0x1' }),
+        /chainKey is required/,
+      );
+    });
+
+    it('withdrawFromYield should call tool with all params', async () => {
+      const { client, calls } = createClient();
+      await client.withdrawFromYield({
+        vaultTokenAddress: '0xVAULT',
+        underlyingToken: 'USDC',
+        withdrawAmount: 50,
+        fromAccountAddress: '0x1',
+        chainKey: 'base',
+      });
+      assert.strictEqual(calls[0].toolName, 'withdrawFromYield');
+      assert.strictEqual(calls[0].args.vaultTokenAddress, '0xVAULT');
+      assert.strictEqual(calls[0].args.underlyingToken, 'USDC');
+      assert.strictEqual(calls[0].args.withdrawAmount, 50);
+      assert.strictEqual(calls[0].args.fromAccountAddress, '0x1');
+      assert.strictEqual(calls[0].args.chainKey, 'base');
     });
   });
 });

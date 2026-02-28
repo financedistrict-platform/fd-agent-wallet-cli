@@ -46,6 +46,12 @@ class WalletClient {
     return this.mcpClient.close();
   }
 
+  async getTokenPrice({ token }) {
+    if (!token) throw new Error('token is required');
+
+    return this.mcpClient.callTool('getTokenPrice', { token });
+  }
+
   async getMyInfo() {
     return this.mcpClient.callTool('getMyInfo', {});
   }
@@ -54,108 +60,69 @@ class WalletClient {
     return this.mcpClient.callTool('getAppVersion', {});
   }
 
-  async helpNarrative({ question, locale, tone }) {
+  async helpNarrative({ question, tone, locale }) {
     if (!question) throw new Error('question is required');
 
     return this.mcpClient.callTool('helpNarrative', {
       question,
-      locale,
       tone,
+      locale,
     });
   }
 
-  async onboardingAssistant({ question, context, locale, tone }) {
+  async onboardingAssistant({ question, context, tone, locale }) {
     if (!question) throw new Error('question is required');
 
     return this.mcpClient.callTool('onboardingAssistant', {
       question,
       context,
-      locale,
       tone,
+      locale,
     });
   }
 
-  async reportIssue({ title, description, severity, category }) {
+  async reportIssue({ title, description, labels }) {
     if (!title) throw new Error('title is required');
     if (!description) throw new Error('description is required');
 
     return this.mcpClient.callTool('reportIssue', {
       title,
       description,
-      severity,
-      category,
+      labels,
     });
   }
 
-  async getWalletOverview({ chainKey, accountAddress }) {
+  async getWalletOverview({ accountAddress, chainKey }) {
     return this.mcpClient.callTool('getWalletOverview', {
-      chainKey,
       accountAddress,
-    });
-  }
-
-  async getAccountActivity({ chainKey, accountAddress, limit, offset }) {
-    return this.mcpClient.callTool('getAccountActivity', {
       chainKey,
-      accountAddress,
-      limit,
-      offset,
     });
   }
 
-  async deploySmartAccount({ chainKey, initialOwners, threshold }) {
-    if (!chainKey) throw new Error('chainKey is required');
-
-    return this.mcpClient.callTool('deploySmartAccount', {
-      chainKey,
-      initialOwners,
-      threshold,
-    });
-  }
-
-  async manageSmartAccountOwnership({
-    chainKey,
-    accountAddress,
-    action,
-    ownerAddress,
-    newThreshold,
-  }) {
-    if (!chainKey) throw new Error('chainKey is required');
+  async getAccountActivity({ accountAddress, chainKey, maxTransactions }) {
     if (!accountAddress) throw new Error('accountAddress is required');
-    if (!action) throw new Error('action is required');
+    if (!chainKey) throw new Error('chainKey is required');
 
-    return this.mcpClient.callTool('manageSmartAccountOwnership', {
-      chainKey,
+    return this.mcpClient.callTool('getAccountActivity', {
       accountAddress,
-      action,
-      ownerAddress,
-      newThreshold,
+      chainKey,
+      maxTransactions,
     });
   }
 
-  async transferTokens({
-    chainKey,
-    fromAccountAddress,
-    recipientAddress,
-    amount,
-    tokenAddress,
-    memo,
-    maxPriorityFeePerGas,
-    maxFeePerGas,
-  }) {
+  async transferTokens({ toAddress, amount, asset, chainKey, fromAccountAddress, autoApprove }) {
+    if (!toAddress) throw new Error('toAddress is required');
+    if (amount == null) throw new Error('amount is required');
+    if (!asset) throw new Error('asset is required');
     if (!chainKey) throw new Error('chainKey is required');
-    if (!recipientAddress) throw new Error('recipientAddress is required');
-    if (!amount) throw new Error('amount is required');
 
     return this.mcpClient.callTool('transferTokens', {
+      toAddress,
+      amount,
+      asset,
       chainKey,
       fromAccountAddress,
-      recipientAddress,
-      amount,
-      tokenAddress,
-      memo,
-      maxPriorityFeePerGas,
-      maxFeePerGas,
+      autoApprove,
     });
   }
 
@@ -164,97 +131,110 @@ class WalletClient {
     tokenIn,
     tokenOut,
     amount,
-    mode,
     objective,
     maxSlippageBps,
     deadlineSeconds,
+    mode,
   }) {
     if (!chainKey) throw new Error('chainKey is required');
     if (!tokenIn) throw new Error('tokenIn is required');
     if (!tokenOut) throw new Error('tokenOut is required');
-    if (!amount) throw new Error('amount is required');
+    if (amount == null) throw new Error('amount is required');
 
     return this.mcpClient.callTool('swapTokens', {
       chainKey,
       tokenIn,
       tokenOut,
       amount,
-      mode,
       objective,
       maxSlippageBps,
       deadlineSeconds,
+      mode,
     });
   }
 
-  async discoverYieldStrategies({ chainKey, tokenAddress, minApy, maxRisk, sortBy }) {
+  async discoverYieldStrategies({ chainKey, token, protocolSlug, sortBy, sortDirection, limit }) {
     return this.mcpClient.callTool('discoverYieldStrategies', {
       chainKey,
-      tokenAddress,
-      minApy,
-      maxRisk,
+      token,
+      protocolSlug,
       sortBy,
+      sortDirection,
+      limit,
     });
   }
 
-  async depositForYield({ chainKey, strategyId, amount, tokenAddress }) {
-    if (!chainKey) throw new Error('chainKey is required');
+  async depositForYield({ strategyId, fromAccountAddress, token, amount, chainKey }) {
     if (!strategyId) throw new Error('strategyId is required');
-    if (!amount) throw new Error('amount is required');
+    if (!fromAccountAddress) throw new Error('fromAccountAddress is required');
+    if (!token) throw new Error('token is required');
+    if (amount == null) throw new Error('amount is required');
+    if (!chainKey) throw new Error('chainKey is required');
 
     return this.mcpClient.callTool('depositForYield', {
-      chainKey,
       strategyId,
+      fromAccountAddress,
+      token,
       amount,
-      tokenAddress,
+      chainKey,
     });
   }
 
-  async withdrawFromYield({ chainKey, positionId, amount, recipient }) {
+  async withdrawFromYield({
+    vaultTokenAddress,
+    underlyingToken,
+    withdrawAmount,
+    fromAccountAddress,
+    chainKey,
+  }) {
+    if (!vaultTokenAddress) throw new Error('vaultTokenAddress is required');
+    if (!underlyingToken) throw new Error('underlyingToken is required');
+    if (withdrawAmount == null) throw new Error('withdrawAmount is required');
+    if (!fromAccountAddress) throw new Error('fromAccountAddress is required');
     if (!chainKey) throw new Error('chainKey is required');
-    if (!positionId) throw new Error('positionId is required');
 
     return this.mcpClient.callTool('withdrawFromYield', {
+      vaultTokenAddress,
+      underlyingToken,
+      withdrawAmount,
+      fromAccountAddress,
       chainKey,
-      positionId,
-      amount,
-      recipient,
     });
   }
 
-  async authorizePayment({
-    url,
-    preferredNetwork,
-    preferredNetworkName,
-    preferredAsset,
-    maxPaymentAmount,
-  }) {
-    if (!url) throw new Error('url is required');
+  async authorizePayment({ paymentRequirementsResponseJson, autoApprove }) {
+    if (!paymentRequirementsResponseJson) {
+      throw new Error('paymentRequirementsResponseJson is required');
+    }
 
     return this.mcpClient.callTool('authorizePayment', {
-      url,
-      preferredNetwork,
-      preferredNetworkName,
-      preferredAsset,
-      maxPaymentAmount,
+      paymentRequirementsResponseJson,
+      autoApprove,
     });
   }
 
   async getX402Content({
     url,
+    maxPaymentAmount,
+    preferredAsset,
     preferredNetwork,
     preferredNetworkName,
-    preferredAsset,
-    maxPaymentAmount,
   }) {
     if (!url) throw new Error('url is required');
 
     return this.mcpClient.callTool('getX402Content', {
       url,
+      maxPaymentAmount,
+      preferredAsset,
       preferredNetwork,
       preferredNetworkName,
-      preferredAsset,
-      maxPaymentAmount,
     });
+  }
+
+  async resolveNameService({ nameOrAddress }) {
+    if (!nameOrAddress) throw new Error('nameOrAddress is required');
+
+    return this.mcpClient.callTool('resolveNameService', { nameOrAddress });
   }
 }
 

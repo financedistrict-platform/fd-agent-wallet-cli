@@ -22,7 +22,8 @@ function mockAuthClient({ token = 'test-token', refreshFails = false } = {}) {
  */
 function injectMockSDKClient(mcpClient, callToolHandler) {
   mcpClient.connect = async function () {
-    await this.authClient.getAccessToken();
+    const token = await this.authClient.getAccessToken();
+    this._currentAccessToken = token;
     this._client = {
       callTool: callToolHandler || (async () => ({ content: [{ type: 'text', text: '"ok"' }] })),
       listTools: async () => ({ tools: [{ name: 'testTool' }] }),
@@ -207,6 +208,71 @@ describe('MCPClient', () => {
       assert.strictEqual(result.error.code, 'AUTH_REFRESH_FAILED');
     });
 
+    it('should return SESSION_EXPIRED when session is fully expired (proactive path)', async () => {
+      const client = new MCPClient({
+        mcpServerUrl: 'https://example.com',
+        authClient: {
+          getAccessToken: async () => {
+            const err = new Error('Session expired \u2014 run "fdx login" to re-authenticate');
+            err.code = 'SESSION_EXPIRED';
+            throw err;
+          },
+          refreshToken: async () => { throw new Error('should not be called'); },
+        },
+      });
+
+      // Simulate existing connection so #ensureFreshConnection runs
+      client._client = { callTool: async () => ({ content: [] }) };
+      client._transport = { close: async () => {} };
+      client._currentAccessToken = 'stale-token';
+
+      const result = await client.callTool('test');
+      assert.strictEqual(result.error.code, 'SESSION_EXPIRED');
+      assert.ok(result.error.message.includes('fdx login'));
+    });
+
+    it('should return SESSION_EXPIRED when 401 retry leads to expired refresh token', async () => {
+      const client = new MCPClient({
+        mcpServerUrl: 'https://example.com',
+        authClient: {
+          getAccessToken: async () => 'test-token',
+          refreshToken: async () => {
+            const err = new Error('Session expired \u2014 run "fdx login" to re-authenticate');
+            err.code = 'SESSION_EXPIRED';
+            throw err;
+          },
+        },
+      });
+
+      injectMockSDKClient(client, async () => {
+        const err = new Error('Unauthorized');
+        err.httpStatusCode = 401;
+        throw err;
+      });
+
+      const result = await client.callTool('test');
+      assert.strictEqual(result.error.code, 'SESSION_EXPIRED');
+      assert.ok(result.error.message.includes('fdx login'));
+    });
+
+    it('should return SESSION_EXPIRED on first connect when tokens are fully expired', async () => {
+      const client = new MCPClient({
+        mcpServerUrl: 'https://example.com',
+        authClient: {
+          getAccessToken: async () => {
+            const err = new Error('Session expired \u2014 run "fdx login" to re-authenticate');
+            err.code = 'SESSION_EXPIRED';
+            throw err;
+          },
+          refreshToken: async () => { throw new Error('should not be called'); },
+        },
+      });
+
+      const result = await client.callTool('test');
+      assert.strictEqual(result.error.code, 'SESSION_EXPIRED');
+      assert.ok(result.error.message.includes('fdx login'));
+    });
+
     it('should return REQUEST_ERROR when local token is missing (not retryable)', async () => {
       const client = new MCPClient({
         mcpServerUrl: 'https://example.com',
@@ -314,7 +380,8 @@ describe('MCPClient', () => {
       });
 
       client.connect = async function () {
-        await this.authClient.getAccessToken();
+        const token = await this.authClient.getAccessToken();
+        this._currentAccessToken = token;
         this._client = {
           listTools: async () => {
             callCount++;
@@ -333,6 +400,28 @@ describe('MCPClient', () => {
       const tools = await client.listTools();
       assert.deepStrictEqual(tools, [{ name: 'retried' }]);
       assert.strictEqual(auth.refreshCalled, true);
+    });
+
+    it('should throw SESSION_EXPIRED when session is fully expired', async () => {
+      const client = new MCPClient({
+        mcpServerUrl: 'https://example.com',
+        authClient: {
+          getAccessToken: async () => {
+            const err = new Error('Session expired \u2014 run "fdx login" to re-authenticate');
+            err.code = 'SESSION_EXPIRED';
+            throw err;
+          },
+          refreshToken: async () => { throw new Error('should not be called'); },
+        },
+      });
+
+      await assert.rejects(
+        () => client.listTools(),
+        (err) => {
+          assert.strictEqual(err.code, 'SESSION_EXPIRED');
+          return true;
+        },
+      );
     });
   });
 
@@ -362,6 +451,126 @@ describe('MCPClient', () => {
       // Should not throw
       await client.close();
       assert.strictEqual(client._client, null);
+    });
+  });
+
+  describe('proactive token refresh', () => {
+    it('should reconnect when getAccessToken returns a new token', async () => {
+      let currentToken = 'token-v1';
+      let connectCount = 0;
+      const auth = {
+        getAccessToken: async () => currentToken,
+        refreshToken: async () => {},
+      };
+      const client = new MCPClient({
+        mcpServerUrl: 'https://example.com',
+        authClient: auth,
+      });
+
+      const originalConnect = client.connect.bind(client);
+      client.connect = async function () {
+        connectCount++;
+        const token = await this.authClient.getAccessToken();
+        this._currentAccessToken = token;
+        this._client = {
+          callTool: async () => ({ content: [{ type: 'text', text: '"ok"' }] }),
+          listTools: async () => ({ tools: [] }),
+        };
+        this._transport = { close: async () => {} };
+      };
+
+      // First call — connect
+      await client.callTool('test');
+      assert.strictEqual(connectCount, 1);
+
+      // Second call — same token, no reconnect
+      await client.callTool('test');
+      assert.strictEqual(connectCount, 1);
+
+      // Simulate token refresh
+      currentToken = 'token-v2';
+
+      // Third call — new token detected, should reconnect
+      await client.callTool('test');
+      assert.strictEqual(connectCount, 2);
+      assert.strictEqual(client._currentAccessToken, 'token-v2');
+    });
+
+    it('should reconnect for listTools when token changes', async () => {
+      let currentToken = 'token-v1';
+      let connectCount = 0;
+      const auth = {
+        getAccessToken: async () => currentToken,
+        refreshToken: async () => {},
+      };
+      const client = new MCPClient({
+        mcpServerUrl: 'https://example.com',
+        authClient: auth,
+      });
+
+      client.connect = async function () {
+        connectCount++;
+        const token = await this.authClient.getAccessToken();
+        this._currentAccessToken = token;
+        this._client = {
+          callTool: async () => ({ content: [{ type: 'text', text: '"ok"' }] }),
+          listTools: async () => ({ tools: [{ name: 'refreshedTool' }] }),
+        };
+        this._transport = { close: async () => {} };
+      };
+
+      // First call — connect
+      await client.listTools();
+      assert.strictEqual(connectCount, 1);
+
+      // Token changes
+      currentToken = 'token-v2';
+
+      // Second call — should reconnect
+      const tools = await client.listTools();
+      assert.strictEqual(connectCount, 2);
+      assert.deepStrictEqual(tools, [{ name: 'refreshedTool' }]);
+    });
+
+    it('should continue with existing connection when getAccessToken fails', async () => {
+      let failGetToken = false;
+      let callCount = 0;
+      const auth = {
+        getAccessToken: async () => {
+          if (failGetToken) throw new Error('credential store locked');
+          return 'token-v1';
+        },
+        refreshToken: async () => {},
+      };
+      const client = new MCPClient({
+        mcpServerUrl: 'https://example.com',
+        authClient: auth,
+      });
+
+      client.connect = async function () {
+        const token = await this.authClient.getAccessToken();
+        this._currentAccessToken = token;
+        this._client = {
+          callTool: async () => {
+            callCount++;
+            return { content: [{ type: 'text', text: '"ok"' }] };
+          },
+          listTools: async () => ({ tools: [] }),
+        };
+        this._transport = { close: async () => {} };
+      };
+
+      // First call — connect succeeds
+      await client.callTool('test');
+      assert.strictEqual(callCount, 1);
+
+      // getAccessToken now fails (e.g., credential store locked)
+      failGetToken = true;
+
+      // Second call — ensureFreshConnection fails silently, existing connection is used
+      const result = await client.callTool('test');
+      assert.strictEqual(callCount, 2);
+      assert.deepStrictEqual(result, { data: 'ok' });
     });
   });
 });

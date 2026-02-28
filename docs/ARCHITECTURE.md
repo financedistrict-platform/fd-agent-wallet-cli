@@ -19,7 +19,7 @@ FDX is a three-layer system that gives AI agents secure access to blockchain wal
 │  ┌─────────────────┐                                               │
 │  │  CLI Commands   │                                               │
 │  │                 │                                               │
-│  │  • fdx setup    │                                               │
+│  │  • fdx login    │                                               │
 │  │  • fdx status   │                                               │
 │  │  • fdx call     │                                               │
 │  │    <method>     │                                               │
@@ -91,7 +91,7 @@ The remote server (hosted at fd.xyz) provides:
 
 ## Authentication Flow
 
-### First-Time Setup (`fdx setup`)
+### First-Time Login (`fdx login`)
 
 1. **Discover OAuth server**: Fetch protected-resource and authorization-server metadata
 2. **Register OAuth client**: POST to `/oauth/register` (RFC 7591 DCR) with device_code grant

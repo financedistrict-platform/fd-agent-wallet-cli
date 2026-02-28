@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-require('dotenv').config({ path: require('path').resolve(process.cwd(), '.env') });
+require('dotenv').config({ path: require('path').resolve(process.cwd(), '.env'), quiet: true });
 
 const { Command } = require('commander');
 const pc = require('picocolors');
@@ -27,10 +27,24 @@ program
   );
 
 program
-  .command('setup')
-  .description('Run OAuth 2.1 device authorization flow')
+  .command('login')
+  .description('Authenticate via OAuth 2.1 device authorization flow')
   .action(async () => {
-    await require('./commands/setup')();
+    await require('./commands/login')();
+  });
+
+program
+  .command('signup')
+  .description('Open the Finance District sign-up page')
+  .action(async () => {
+    await require('./commands/signup')();
+  });
+
+program
+  .command('setup', { hidden: true })
+  .description('Alias for "login" (deprecated)')
+  .action(async () => {
+    await require('./commands/login')();
   });
 
 program
@@ -50,12 +64,12 @@ program
 program
   .command('call')
   .description('Invoke an MCP tool')
-  .argument('<method>', 'tool name to invoke')
+  .argument('[method]', 'tool name to invoke')
   .allowUnknownOption()
   .allowExcessArguments(true)
   .passThroughOptions()
   .action(async (method, _opts, cmd) => {
-    await require('./commands/call')([method, ...cmd.args.slice(1)]);
+    await require('./commands/call')([method, ...cmd.args.slice(1)].filter(Boolean));
   });
 
 program.parseAsync().catch((error) => {

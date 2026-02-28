@@ -8,5 +8,5 @@ module.exports = async function logout() {
   await client.logout();
 
   console.log(pc.green('Logged out.') + ' Credentials removed.');
-  console.log(`  Run ${pc.cyan('"fdx setup"')} to authenticate again.`);
+  console.log(`  Run ${pc.cyan('"fdx login"')} to authenticate again.`);
 };

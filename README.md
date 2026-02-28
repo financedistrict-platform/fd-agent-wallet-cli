@@ -4,57 +4,108 @@
 [![CI](https://github.com/financedistrict-platform/fd-agent-wallet-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/financedistrict-platform/fd-agent-wallet-cli/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A command-line interface to the [Finance District](https://fd.xyz) MCP wallet server. Gives AI agents crypto wallet capabilities — hold, send, swap, and earn yield on assets across multiple chains — without managing private keys.
+The official [Finance District](https://fd.xyz) CLI for [Agent Wallet](https://fd.xyz/agent-wallet) — give your AI agent a crypto wallet in minutes.
 
 ## Why FDX?
 
-FDX is designed for AI agents and agent frameworks that need wallet tooling but don't natively support the [Model Context Protocol (MCP)](https://modelcontextprotocol.io). Instead of integrating an MCP client, agents invoke `fdx call <method>` from the command line and parse JSON output.
+[Finance District](https://fd.xyz) is an open financial ecosystem where humans and AI transact together — from payments and wallets to on-chain asset management. **Agent Wallet CLI** gives your AI genuine financial autonomy: its own wallet, not a borrowed connection to yours.
 
-- **No Key Management** — OAuth 2.1 secured. No seed phrases. No private key files.
-- **Agent-Native** — Structured JSON input/output designed for tool-calling agents.
-- **Multi-Chain** — Ethereum, BSC, Arbitrum, Base, Solana. One wallet, all chains.
-- **DeFi Enabled** — Transfer, swap, and earn yield through integrated DeFi protocols.
-- **Smart Accounts** — Account abstraction with multi-signature support (ERC-4337).
+- **Security** — Non-custodial architecture with hardware-backed access controls and smart accounts (ERC-4337). Your agent never touches private keys.
+- **Trust** — Built by the team behind institutional-grade custody and settlement systems. Production infrastructure, not a weekend project.
+- **Autonomy** — Full wallet capabilities with no artificial restrictions. Hold, send, swap, and earn yield across chains — your agent decides how to act.
+
+### What your agent can do
+
+- **Hold money** — Receive, hold, and manage assets across Ethereum, BSC, Arbitrum, Base, and Solana.
+- **Pay and get paid** — Transfer tokens, authorize payments, and access paid APIs on behalf of the user.
+- **Earn yield** — Discover and deposit into DeFi strategies (Aave, Compound, Yearn) without leaving the conversation.
+- **Swap assets** — Trade tokens across DEXs with smart routing, slippage protection, and MEV shielding.
+- **Work anywhere** — Structured JSON over the command line. If your agent can run a shell command, it can use FDX.
 
 ## Quick Start
+
+### 1. Sign up for Finance District
+
+Create a free account — just an email and a confirmation click:
+
+```bash
+fdx signup
+```
+
+### 2. Install the CLI
 
 ```bash
 npm install -g @financedistrict/fdx
 ```
 
-Run the setup:
+### 3. Log in
 
 ```bash
-fdx setup
+fdx login
 ```
 
-Check that authentication succeeded:
+A one-time code will appear. Open the verification URL, enter the code, and you're authenticated.
+
+### 4. Verify
 
 ```bash
 fdx status
 ```
 
-To remove stored credentials:
+Done. Your agent can now call any wallet method.
+
+## Agent Wallet Skills
+
+FDX works best with the Agent Wallet skills — pre-built tool definitions that let your agent understand what wallet actions are available and how to call them.
+
+Install all Agent Wallet skills with [Vercel's Skills CLI](https://sdk.vercel.ai/docs/ai-sdk-core/agents#skills):
 
 ```bash
-fdx logout
+npx skills add financedistrict-platform/fd-agent-wallet-skills
 ```
+
+## Usage
+
+```bash
+# Check wallet overview
+fdx call getWalletOverview --chainKey ethereum
+
+# Send tokens
+fdx call transferTokens --chainKey ethereum --recipientAddress 0xABC... --amount 0.1
+
+# Swap tokens
+fdx call swapTokens --chainKey base --tokenIn USDC --tokenOut ETH --amount 100
+
+# Discover yield strategies
+fdx call discoverYieldStrategies --chainKey base
+
+# Get account info
+fdx call getMyInfo
+```
+
+All output is JSON, making it easy for agents to parse:
+
+```bash
+fdx call getMyInfo | jq '.email'
+```
+
+Run `fdx call` without arguments to see all available methods.
 
 ## Authentication
 
 FDX uses OAuth 2.1 with the Device Authorization Grant (RFC 8628). Authentication is always tied to a user identity — the agent acts as a delegate on the user's behalf.
 
-### Setup
+### Login
 
 ```bash
-fdx setup
+fdx login
 ```
 
 The CLI retrieves a short one-time code and prints it alongside the verification URL:
 
 ```
 ──────────────────────────────────────────────────────────
-  Verification URL: https://microsoft.com/devicelogin
+  Verification URL: https://auth.fd.xyz/device
   Enter code:       ABCD-1234
 ──────────────────────────────────────────────────────────
 ```
@@ -79,30 +130,7 @@ If no credential store is available (e.g. a minimal container), tokens fall back
 fdx logout
 ```
 
-Removes the stored access and refresh tokens from the OS credential store and clears them from `~/.fdx/auth.json`. Client registrations (DCR) are preserved so the next `fdx setup` skips re-registration and goes straight to authentication.
-
-## Usage
-
-Invoke any MCP tool via the CLI:
-
-```bash
-# Check wallet overview
-fdx call getWalletOverview --chainKey ethereum
-
-# Send tokens
-fdx call transferTokens --chainKey ethereum --recipientAddress 0xABC... --amount 0.1
-
-# Discover yield strategies
-fdx call discoverYieldStrategies --chainKey base
-```
-
-All output is JSON, making it easy for agents to parse:
-
-```bash
-fdx call getMyInfo | jq '.email'
-```
-
-Run `fdx call` without arguments to see all available methods.
+Removes stored tokens from the OS credential store and `~/.fdx/auth.json`. The next `fdx login` goes straight to authentication without re-registration.
 
 ## SDK Usage
 
@@ -120,7 +148,7 @@ console.log(result.data);
 
 | Environment Variable | Description        | Default                                |
 | -------------------- | ------------------ | -------------------------------------- |
-| `FDX_MCP_SERVER`     | MCP server URL     | `https://mcp.fd.xyz`                   |
+| `FDX_MCP_SERVER`     | Server URL         | `https://mcp.fd.xyz`                   |
 | `FDX_STORE_PATH`     | Token store path   | `~/.fdx/auth.json`                     |
 | `FDX_LOG_PATH`       | Log file path      | `~/.fdx/fdx.log`                       |
 | `FDX_LOG_LEVEL`      | Log verbosity (`debug`\|`info`\|`warn`\|`error`\|`off`) | `info` |

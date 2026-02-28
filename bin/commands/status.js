@@ -21,7 +21,7 @@ module.exports = async function status() {
     console.log(pc.yellow('Status: not authenticated'));
     console.log(`  ${pc.dim('MCP server:')}  ${mcpServer}`);
     console.log(`  ${pc.dim('Store path:')} ${storePath}`);
-    console.log(`  Run ${pc.cyan('"fdx setup"')} to authenticate.`);
+    console.log(`  Run ${pc.cyan('"fdx login"')} to authenticate.`);
     process.exit(1);
   }
 
@@ -44,7 +44,7 @@ module.exports = async function status() {
     console.log('');
     console.log(
       pc.red('Token expired and no refresh token.') +
-        ` Run ${pc.cyan('"fdx setup"')} to re-authenticate.`,
+        ` Run ${pc.cyan('"fdx login"')} to re-authenticate.`,
     );
     process.exit(1);
   }

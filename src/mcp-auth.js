@@ -124,7 +124,7 @@ class MCPAuthClient {
       await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
 
       if (Date.now() >= deadline) {
-        throw new Error('Device flow code expired \u2014 please run setup again');
+        throw new Error('Device flow code expired \u2014 please run "fdx login" again');
       }
 
       const payload = new URLSearchParams({
@@ -152,7 +152,7 @@ class MCPAuthClient {
         } else if (error === 'access_denied') {
           throw new Error('Device flow access denied by user');
         } else if (error === 'expired_token') {
-          throw new Error('Device flow code expired \u2014 please run setup again');
+          throw new Error('Device flow code expired \u2014 please run "fdx login" again');
         } else {
           throw err;
         }
@@ -183,12 +183,14 @@ class MCPAuthClient {
     }
 
     if (!this.clientId) {
-      throw new Error('No client ID available \u2014 run setup first');
+      throw new Error('No client ID available \u2014 run "fdx login" first');
     }
 
     const tokens = await this.#getTokens();
     if (!tokens?.refreshToken) {
-      throw new Error('No refresh token available');
+      const error = new Error('No refresh token available \u2014 run "fdx login" to re-authenticate');
+      error.code = 'SESSION_EXPIRED';
+      throw error;
     }
 
     logger.debug('mcp-auth: refreshing access token', { server: this.mcpServerUrl });
@@ -199,9 +201,21 @@ class MCPAuthClient {
       client_id: this.clientId,
     });
 
-    const { data } = await this.httpClient.post(this.tokenEndpoint, payload.toString(), {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    });
+    let data;
+    try {
+      ({ data } = await this.httpClient.post(this.tokenEndpoint, payload.toString(), {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      }));
+    } catch (err) {
+      const oauthError = err.response?.data?.error;
+      if (oauthError === 'invalid_grant' || oauthError === 'interaction_required') {
+        logger.warn('mcp-auth: refresh token rejected by server', { error: oauthError });
+        const error = new Error('Session expired \u2014 run "fdx login" to re-authenticate');
+        error.code = 'SESSION_EXPIRED';
+        throw error;
+      }
+      throw err;
+    }
 
     await this.#persistTokens({ ...tokens, ...data });
     logger.info('mcp-auth: access token refreshed', { server: this.mcpServerUrl });
@@ -366,7 +380,7 @@ class MCPAuthClient {
         // Credential store read threw — fall through to error below
       }
       throw new Error(
-        'OS credential store is unavailable \u2014 re-run "fdx setup" to re-authenticate',
+        'OS credential store is unavailable \u2014 re-run "fdx login" to re-authenticate',
       );
     }
 

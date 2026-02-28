@@ -6,6 +6,10 @@ const { afterEach, beforeEach, describe, it } = require('node:test');
 
 const { MCPAuthClient } = require('../src/mcp-auth');
 
+const TEST_TENANT = 'testtenant';
+const TEST_CLIENT_ID = 'test-client-id';
+const TEST_AUTHORITY = `https://${TEST_TENANT}.ciamlogin.com/${TEST_TENANT}.onmicrosoft.com`;
+
 function mockCredentialStore(available = true) {
   const secrets = {};
   return {
@@ -37,20 +41,12 @@ function createClient(tmpDir, credStore, httpClient) {
     storePath,
     httpClient: httpClient || mockHttpClient(),
     credentialStore: credStore,
+    entraConfig: {
+      authority: TEST_AUTHORITY,
+      clientId: TEST_CLIENT_ID,
+      scopes: 'openid offline_access',
+    },
   });
-
-  return { client, storePath };
-}
-
-function createInitializedClient(tmpDir, credStore) {
-  const { client, storePath } = createClient(tmpDir, credStore);
-
-  client.oauthServerUrl = 'https://auth.example.com';
-  client.tokenEndpoint = 'https://auth.example.com/token';
-  client.deviceAuthorizationEndpoint = 'https://auth.example.com/devicecode';
-  client.clientId = 'test-client-id';
-  client._initialized = true;
-  client._discovered = true;
 
   return { client, storePath };
 }
@@ -68,19 +64,19 @@ describe('MCPAuthClient - Credential Store Integration', () => {
 
   it('should store tokens in credential store when available', async () => {
     const credStore = mockCredentialStore(true);
-    const { client, storePath } = createInitializedClient(tmpDir, credStore);
+    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
+      post: async () => ({
+        data: {
+          access_token: 'access-123',
+          refresh_token: 'refresh-456',
+          token_type: 'Bearer',
+          expires_in: 3600,
+          scope: 'openid',
+        },
+      }),
+    }));
 
-    client.httpClient.post = async () => ({
-      data: {
-        access_token: 'access-123',
-        refresh_token: 'refresh-456',
-        token_type: 'Bearer',
-        expires_in: 3600,
-        scope: 'openid',
-      },
-    });
-
-    await client.pollDeviceToken({ deviceCode: 'test-device-code', interval: 0 });
+    await client.completeSignIn('ct-123', 'otp-code', 'user@example.com');
 
     const secret = JSON.parse(credStore._secrets['mcp.test.example.com']);
     assert.strictEqual(secret.accessToken, 'access-123');
@@ -95,22 +91,22 @@ describe('MCPAuthClient - Credential Store Integration', () => {
 
   it('should fall back to file when credential store is not available', async () => {
     const credStore = mockCredentialStore(false);
-    const { client, storePath } = createInitializedClient(tmpDir, credStore);
+    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
+      post: async () => ({
+        data: {
+          access_token: 'access-plain',
+          refresh_token: 'refresh-plain',
+          token_type: 'Bearer',
+          expires_in: 3600,
+        },
+      }),
+    }));
 
     const warnings = [];
     const handler = (w) => warnings.push(w);
     process.on('warning', handler);
 
-    client.httpClient.post = async () => ({
-      data: {
-        access_token: 'access-plain',
-        refresh_token: 'refresh-plain',
-        token_type: 'Bearer',
-        expires_in: 3600,
-      },
-    });
-
-    await client.pollDeviceToken({ deviceCode: 'test-device-code', interval: 0 });
+    await client.completeSignIn('ct-123', 'otp-code', 'user@example.com');
 
     process.removeListener('warning', handler);
 
@@ -125,7 +121,7 @@ describe('MCPAuthClient - Credential Store Integration', () => {
 
   it('should read tokens from credential store when credentialStore flag is set', async () => {
     const credStore = mockCredentialStore(true);
-    const { client, storePath } = createInitializedClient(tmpDir, credStore);
+    const { client, storePath } = createClient(tmpDir, credStore);
 
     credStore._secrets['mcp.test.example.com'] = JSON.stringify({
       accessToken: 'keychain-access',
@@ -149,7 +145,7 @@ describe('MCPAuthClient - Credential Store Integration', () => {
 
   it('should read tokens from file in legacy mode (no credentialStore flag)', async () => {
     const credStore = mockCredentialStore(true);
-    const { client, storePath } = createInitializedClient(tmpDir, credStore);
+    const { client, storePath } = createClient(tmpDir, credStore);
 
     await fs.writeFile(
       storePath,
@@ -169,7 +165,7 @@ describe('MCPAuthClient - Credential Store Integration', () => {
 
   it('should throw when credential store has no data and flag is set', async () => {
     const credStore = mockCredentialStore(true);
-    const { client, storePath } = createInitializedClient(tmpDir, credStore);
+    const { client, storePath } = createClient(tmpDir, credStore);
 
     await fs.writeFile(
       storePath,
@@ -186,9 +182,8 @@ describe('MCPAuthClient - Credential Store Integration', () => {
 
   it('should throw when credential store read fails after setup', async () => {
     const credStore = mockCredentialStore(true);
-    const { client, storePath } = createInitializedClient(tmpDir, credStore);
+    const { client, storePath } = createClient(tmpDir, credStore);
 
-    // Simulate: setup stored tokens in credential store, then keyring becomes unavailable
     credStore.getSecret = () => null;
 
     await fs.writeFile(
@@ -210,7 +205,7 @@ describe('MCPAuthClient - Credential Store Integration', () => {
 
   it('should throw when credential store throws during read', async () => {
     const credStore = mockCredentialStore(true);
-    const { client, storePath } = createInitializedClient(tmpDir, credStore);
+    const { client, storePath } = createClient(tmpDir, credStore);
 
     credStore.getSecret = () => { throw new Error('dbus connection failed'); };
 
@@ -233,7 +228,15 @@ describe('MCPAuthClient - Credential Store Integration', () => {
 
   it('should preserve refresh token during token refresh', async () => {
     const credStore = mockCredentialStore(true);
-    const { client, storePath } = createInitializedClient(tmpDir, credStore);
+    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
+      post: async () => ({
+        data: {
+          access_token: 'new-access',
+          token_type: 'Bearer',
+          expires_in: 3600,
+        },
+      }),
+    }));
 
     credStore._secrets['mcp.test.example.com'] = JSON.stringify({
       accessToken: 'old-access',
@@ -251,14 +254,6 @@ describe('MCPAuthClient - Credential Store Integration', () => {
       }),
     );
 
-    client.httpClient.post = async () => ({
-      data: {
-        access_token: 'new-access',
-        token_type: 'Bearer',
-        expires_in: 3600,
-      },
-    });
-
     const newToken = await client.refreshToken();
     assert.strictEqual(newToken, 'new-access');
 
@@ -267,23 +262,19 @@ describe('MCPAuthClient - Credential Store Integration', () => {
     assert.strictEqual(secret.refreshToken, 'original-refresh');
   });
 
-  it('should refresh using clientId from store', async () => {
+  it('should send refresh_token grant to Entra token endpoint', async () => {
     let postCount = 0;
     const credStore = mockCredentialStore(true);
     const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
-      post: async (_url, body) => {
+      post: async (url, body) => {
         postCount++;
+        assert.ok(url.includes('/oauth2/v2.0/token'), 'should POST to Entra token endpoint');
         const params = new URLSearchParams(body);
-        assert.strictEqual(params.get('grant_type'), 'refresh_token', 'only refresh_token grant expected');
+        assert.strictEqual(params.get('grant_type'), 'refresh_token');
+        assert.strictEqual(params.get('client_id'), TEST_CLIENT_ID);
         return { data: { access_token: 'new-at', token_type: 'Bearer', expires_in: 3600 } };
       },
     }));
-
-    client.oauthServerUrl = 'https://auth.example.com';
-    client.tokenEndpoint = 'https://auth.example.com/token';
-    client.clientId = 'my-client-id';
-    client._initialized = true;
-    client._discovered = true;
 
     credStore._secrets['mcp.test.example.com'] = JSON.stringify({
       accessToken: 'old-at',
@@ -291,7 +282,7 @@ describe('MCPAuthClient - Credential Store Integration', () => {
     });
     await fs.writeFile(
       storePath,
-      JSON.stringify({ mcpAuth: { clientId: 'my-client-id' }, tokens: { credentialStore: true } }),
+      JSON.stringify({ mcpAuth: { email: 'user@example.com' }, tokens: { credentialStore: true } }),
     );
 
     const newToken = await client.refreshToken();
@@ -299,43 +290,16 @@ describe('MCPAuthClient - Credential Store Integration', () => {
     assert.strictEqual(postCount, 1, 'only one POST');
   });
 
-  it('should refresh using legacy deviceClientId from store', async () => {
-    let postCount = 0;
+  it('should throw when clientId is not configured during refresh', async () => {
     const credStore = mockCredentialStore(true);
-    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
-      post: async (_url, body) => {
-        postCount++;
-        const params = new URLSearchParams(body);
-        assert.strictEqual(params.get('grant_type'), 'refresh_token');
-        return { data: { access_token: 'new-device-at', token_type: 'Bearer', expires_in: 3600 } };
-      },
-    }));
-
-    client.oauthServerUrl = 'https://auth.example.com';
-    client.tokenEndpoint = 'https://auth.example.com/token';
-    client._discovered = true;
-
-    credStore._secrets['mcp.test.example.com'] = JSON.stringify({
-      accessToken: 'old-at',
-      refreshToken: 'device-refresh-token',
-    });
-    await fs.writeFile(
+    const storePath = path.join(tmpDir, 'auth.json');
+    const client = new MCPAuthClient({
+      mcpServerUrl: 'https://mcp.test.example.com',
       storePath,
-      JSON.stringify({ mcpAuth: { deviceClientId: 'device-client-id' }, tokens: { credentialStore: true } }),
-    );
-
-    const newToken = await client.refreshToken();
-    assert.strictEqual(newToken, 'new-device-at');
-    assert.strictEqual(postCount, 1);
-  });
-
-  it('should throw when clientId is not available during refresh', async () => {
-    const credStore = mockCredentialStore(true);
-    const { client, storePath } = createClient(tmpDir, credStore);
-
-    client.oauthServerUrl = 'https://auth.example.com';
-    client.tokenEndpoint = 'https://auth.example.com/token';
-    client._discovered = true;
+      httpClient: mockHttpClient(),
+      credentialStore: credStore,
+      entraConfig: { authority: TEST_AUTHORITY, scopes: 'openid' },
+    });
 
     credStore._secrets['mcp.test.example.com'] = JSON.stringify({
       accessToken: 'old-at',
@@ -349,161 +313,10 @@ describe('MCPAuthClient - Credential Store Integration', () => {
     await assert.rejects(() => client.refreshToken(), /No client ID/);
   });
 
-  it('should throw SESSION_EXPIRED when no refresh token is available', async () => {
-    const credStore = mockCredentialStore(true);
-    const { client, storePath } = createInitializedClient(tmpDir, credStore);
-
-    credStore._secrets['mcp.test.example.com'] = JSON.stringify({
-      accessToken: 'old-at',
-    });
-    await fs.writeFile(
-      storePath,
-      JSON.stringify({ mcpAuth: { clientId: 'cid' }, tokens: { credentialStore: true, expiresAt: Date.now() - 60000 } }),
-    );
-
-    await assert.rejects(
-      () => client.refreshToken(),
-      (err) => {
-        assert.strictEqual(err.code, 'SESSION_EXPIRED');
-        assert.ok(err.message.includes('fdx login'));
-        return true;
-      },
-    );
-  });
-
-  it('should throw SESSION_EXPIRED when server returns invalid_grant', async () => {
-    const credStore = mockCredentialStore(true);
-    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
-      post: async () => {
-        const err = new Error('Request failed with status code 400');
-        err.response = { data: { error: 'invalid_grant', error_description: 'Refresh token expired' } };
-        throw err;
-      },
-    }));
-
-    client.oauthServerUrl = 'https://auth.example.com';
-    client.tokenEndpoint = 'https://auth.example.com/token';
-    client.clientId = 'my-client-id';
-    client._discovered = true;
-
-    credStore._secrets['mcp.test.example.com'] = JSON.stringify({
-      accessToken: 'old-at',
-      refreshToken: 'expired-refresh-token',
-    });
-    await fs.writeFile(
-      storePath,
-      JSON.stringify({ mcpAuth: { clientId: 'my-client-id' }, tokens: { credentialStore: true } }),
-    );
-
-    await assert.rejects(
-      () => client.refreshToken(),
-      (err) => {
-        assert.strictEqual(err.code, 'SESSION_EXPIRED');
-        assert.ok(err.message.includes('fdx login'));
-        return true;
-      },
-    );
-  });
-
-  it('should throw SESSION_EXPIRED when server returns interaction_required', async () => {
-    const credStore = mockCredentialStore(true);
-    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
-      post: async () => {
-        const err = new Error('Request failed with status code 400');
-        err.response = { data: { error: 'interaction_required' } };
-        throw err;
-      },
-    }));
-
-    client.oauthServerUrl = 'https://auth.example.com';
-    client.tokenEndpoint = 'https://auth.example.com/token';
-    client.clientId = 'my-client-id';
-    client._discovered = true;
-
-    credStore._secrets['mcp.test.example.com'] = JSON.stringify({
-      accessToken: 'old-at',
-      refreshToken: 'stale-refresh',
-    });
-    await fs.writeFile(
-      storePath,
-      JSON.stringify({ mcpAuth: { clientId: 'my-client-id' }, tokens: { credentialStore: true } }),
-    );
-
-    await assert.rejects(
-      () => client.refreshToken(),
-      (err) => {
-        assert.strictEqual(err.code, 'SESSION_EXPIRED');
-        return true;
-      },
-    );
-  });
-
-  it('should propagate SESSION_EXPIRED through getAccessToken when token is expired', async () => {
-    const credStore = mockCredentialStore(true);
-    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
-      post: async () => {
-        const err = new Error('Request failed with status code 400');
-        err.response = { data: { error: 'invalid_grant' } };
-        throw err;
-      },
-    }));
-
-    client.oauthServerUrl = 'https://auth.example.com';
-    client.tokenEndpoint = 'https://auth.example.com/token';
-    client.clientId = 'my-client-id';
-    client._discovered = true;
-
-    credStore._secrets['mcp.test.example.com'] = JSON.stringify({
-      accessToken: 'old-at',
-      refreshToken: 'expired-rt',
-    });
-    await fs.writeFile(
-      storePath,
-      JSON.stringify({
-        mcpAuth: { clientId: 'my-client-id' },
-        tokens: { credentialStore: true, expiresAt: Date.now() - 60000 },
-      }),
-    );
-
-    await assert.rejects(
-      () => client.getAccessToken(),
-      (err) => {
-        assert.strictEqual(err.code, 'SESSION_EXPIRED');
-        return true;
-      },
-    );
-  });
-
-  it('should re-throw non-invalid_grant errors during refresh', async () => {
-    const credStore = mockCredentialStore(true);
-    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
-      post: async () => {
-        const err = new Error('Network error');
-        throw err;
-      },
-    }));
-
-    client.oauthServerUrl = 'https://auth.example.com';
-    client.tokenEndpoint = 'https://auth.example.com/token';
-    client.clientId = 'my-client-id';
-    client._discovered = true;
-
-    credStore._secrets['mcp.test.example.com'] = JSON.stringify({
-      accessToken: 'old-at',
-      refreshToken: 'my-rt',
-    });
-    await fs.writeFile(
-      storePath,
-      JSON.stringify({ mcpAuth: { clientId: 'my-client-id' }, tokens: { credentialStore: true } }),
-    );
-
-    await assert.rejects(() => client.refreshToken(), /Network error/);
-  });
-
   describe('getTokenState', () => {
     it('should return authenticated state from credential store', async () => {
       const credStore = mockCredentialStore(true);
-      const { client, storePath } = createInitializedClient(tmpDir, credStore);
+      const { client, storePath } = createClient(tmpDir, credStore);
 
       credStore._secrets['mcp.test.example.com'] = JSON.stringify({
         accessToken: 'token',
@@ -517,7 +330,7 @@ describe('MCPAuthClient - Credential Store Integration', () => {
             credentialStore: true,
             expiresAt: Date.now() + 3600000,
           },
-          mcpAuth: { clientId: 'my-client' },
+          mcpAuth: { email: 'user@example.com' },
         }),
       );
 
@@ -525,13 +338,13 @@ describe('MCPAuthClient - Credential Store Integration', () => {
       assert.strictEqual(state.authenticated, true);
       assert.strictEqual(state.expired, false);
       assert.strictEqual(state.hasRefresh, true);
-      assert.strictEqual(state.clientId, 'my-client');
+      assert.strictEqual(state.email, 'user@example.com');
       assert.strictEqual(state.usingCredentialStore, true);
     });
 
     it('should return not-authenticated when no tokens exist', async () => {
       const credStore = mockCredentialStore(true);
-      const { client } = createInitializedClient(tmpDir, credStore);
+      const { client } = createClient(tmpDir, credStore);
 
       const state = await client.getTokenState();
       assert.strictEqual(state.authenticated, false);
@@ -540,9 +353,8 @@ describe('MCPAuthClient - Credential Store Integration', () => {
 
     it('should return not-authenticated when credential store is unavailable', async () => {
       const credStore = mockCredentialStore(true);
-      const { client, storePath } = createInitializedClient(tmpDir, credStore);
+      const { client, storePath } = createClient(tmpDir, credStore);
 
-      // Simulate keyring locked / dbus unavailable
       credStore.getSecret = () => null;
 
       await fs.writeFile(
@@ -552,19 +364,19 @@ describe('MCPAuthClient - Credential Store Integration', () => {
             credentialStore: true,
             expiresAt: Date.now() + 3600000,
           },
-          mcpAuth: { clientId: 'my-client' },
+          mcpAuth: { email: 'user@example.com' },
         }),
       );
 
       const state = await client.getTokenState();
       assert.strictEqual(state.authenticated, false);
       assert.strictEqual(state.usingCredentialStore, true);
-      assert.strictEqual(state.clientId, 'my-client');
+      assert.strictEqual(state.email, 'user@example.com');
     });
 
     it('should report expired tokens', async () => {
       const credStore = mockCredentialStore(true);
-      const { client, storePath } = createInitializedClient(tmpDir, credStore);
+      const { client, storePath } = createClient(tmpDir, credStore);
 
       credStore._secrets['mcp.test.example.com'] = JSON.stringify({
         accessToken: 'token',
@@ -588,521 +400,295 @@ describe('MCPAuthClient - Credential Store Integration', () => {
   });
 });
 
-describe('MCPAuthClient - initialize()', () => {
+describe('MCPAuthClient - Sign-up Flow', () => {
   let tmpDir;
 
   beforeEach(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fdx-inittest-'));
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fdx-signuptest-'));
   });
 
   afterEach(async () => {
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
-  it('should discover endpoints and register client via DCR', async () => {
-    const requests = { gets: [], posts: [] };
-    const http = mockHttpClient({
-      get: async (url) => {
-        requests.gets.push(url);
-        if (url.includes('oauth-protected-resource')) {
-          return { data: { authorization_servers: ['https://auth.example.com'] } };
-        }
-        if (url.includes('oauth-authorization-server')) {
-          return {
-            data: {
-              token_endpoint: 'https://auth.example.com/token',
-              registration_endpoint: 'https://auth.example.com/register',
-              device_authorization_endpoint: 'https://auth.example.com/devicecode',
-            },
-          };
-        }
-        return { data: {} };
-      },
+  it('startSignUp should POST to signup/start and return continuationToken', async () => {
+    const requests = [];
+    const { client } = createClient(tmpDir, mockCredentialStore(), mockHttpClient({
       post: async (url, body) => {
-        requests.posts.push({ url, body });
-        return { data: { client_id: 'registered-client-123' } };
+        requests.push({ url, body });
+        return { data: { continuation_token: 'ct-signup-1' } };
       },
-    });
+    }));
 
-    const { client } = createClient(tmpDir, mockCredentialStore(), http);
-    await client.initialize();
+    const result = await client.startSignUp('agent@example.com');
 
-    assert.strictEqual(client.clientId, 'registered-client-123');
-    assert.strictEqual(client.tokenEndpoint, 'https://auth.example.com/token');
-
-    assert.ok(requests.gets.some((u) => u.includes('oauth-protected-resource')));
-    assert.ok(requests.gets.some((u) => u.includes('oauth-authorization-server')));
-
-    assert.strictEqual(requests.posts.length, 1);
-    assert.ok(requests.posts[0].url.includes('/register'));
-
-    // Should use device_code grant type
-    const body = typeof requests.posts[0].body === 'string'
-      ? JSON.parse(requests.posts[0].body)
-      : requests.posts[0].body;
-    assert.deepStrictEqual(body.grant_types, ['urn:ietf:params:oauth:grant-type:device_code']);
+    assert.strictEqual(result.continuationToken, 'ct-signup-1');
+    assert.strictEqual(requests.length, 1);
+    assert.ok(requests[0].url.includes('/signup/v1.0/start'));
+    const params = new URLSearchParams(requests[0].body);
+    assert.strictEqual(params.get('username'), 'agent@example.com');
+    assert.strictEqual(params.get('client_id'), TEST_CLIENT_ID);
   });
 
-  it('should use cached metadata on second call', async () => {
-    let getCount = 0;
-    const http = mockHttpClient({
-      get: async (url) => {
-        getCount++;
-        if (url.includes('oauth-protected-resource')) {
-          return { data: { authorization_servers: ['https://auth.example.com'] } };
-        }
-        return {
-          data: {
-            token_endpoint: 'https://auth.example.com/token',
-            registration_endpoint: 'https://auth.example.com/register',
-            device_authorization_endpoint: 'https://auth.example.com/devicecode',
-          },
-        };
-      },
-      post: async () => ({ data: { client_id: 'cached-client' } }),
-    });
-
-    const { client } = createClient(tmpDir, mockCredentialStore(), http);
-    await client.initialize();
-    const firstGetCount = getCount;
-
-    await client.initialize();
-    assert.strictEqual(getCount, firstGetCount);
+  it('startSignUp should throw when email is missing', async () => {
+    const { client } = createClient(tmpDir, mockCredentialStore());
+    await assert.rejects(() => client.startSignUp(), /email is required/);
   });
 
-  it('should not make duplicate registrations on concurrent calls', async () => {
-    let postCount = 0;
-    const http = mockHttpClient({
-      get: async (url) => {
-        if (url.includes('oauth-protected-resource')) {
-          return { data: { authorization_servers: ['https://auth.example.com'] } };
-        }
-        return {
-          data: {
-            token_endpoint: 'https://auth.example.com/token',
-            registration_endpoint: 'https://auth.example.com/register',
-            device_authorization_endpoint: 'https://auth.example.com/devicecode',
-          },
-        };
-      },
-      post: async () => {
-        postCount++;
-        await new Promise((r) => setTimeout(r, 10));
-        return { data: { client_id: 'concurrent-client' } };
-      },
-    });
-
-    const { client } = createClient(tmpDir, mockCredentialStore(), http);
-
-    await Promise.all([client.initialize(), client.initialize(), client.initialize()]);
-
-    assert.strictEqual(postCount, 1);
-  });
-
-  it('should throw when server does not support device flow', async () => {
-    const http = mockHttpClient({
-      get: async (url) => {
-        if (url.includes('oauth-protected-resource')) {
-          return { data: { authorization_servers: ['https://auth.example.com'] } };
-        }
-        return {
-          data: {
-            token_endpoint: 'https://auth.example.com/token',
-          },
-        };
-      },
-    });
-
-    const { client } = createClient(tmpDir, mockCredentialStore(), http);
-    await assert.rejects(() => client.initialize(), /not supported/);
-  });
-
-  it('should reject non-HTTPS endpoints from discovery', async () => {
-    const http = mockHttpClient({
-      get: async (url) => {
-        if (url.includes('oauth-protected-resource')) {
-          return { data: { authorization_servers: ['http://evil.example.com'] } };
-        }
-        return {
-          data: {
-            token_endpoint: 'http://evil.example.com/token',
-            device_authorization_endpoint: 'http://evil.example.com/devicecode',
-          },
-        };
-      },
-    });
-
-    const { client } = createClient(tmpDir, mockCredentialStore(), http);
-    await assert.rejects(() => client.initialize(), /must use HTTPS/);
-  });
-
-  it('should reject non-HTTPS token endpoint from metadata', async () => {
-    const http = mockHttpClient({
-      get: async (url) => {
-        if (url.includes('oauth-protected-resource')) {
-          return { data: { authorization_servers: ['https://auth.example.com'] } };
-        }
-        return {
-          data: {
-            token_endpoint: 'http://evil.example.com/token',
-            device_authorization_endpoint: 'https://auth.example.com/devicecode',
-          },
-        };
-      },
-    });
-
-    const { client } = createClient(tmpDir, mockCredentialStore(), http);
-    await assert.rejects(() => client.initialize(), /must use HTTPS/);
-  });
-
-  it('should throw when no authorization server is found', async () => {
-    const http = mockHttpClient({
-      get: async (url) => {
-        if (url.includes('oauth-protected-resource')) {
-          return { data: { authorization_servers: [] } };
-        }
-        return { data: {} };
-      },
-    });
-
-    const { client } = createClient(tmpDir, mockCredentialStore(), http);
-    await assert.rejects(() => client.initialize(), /No authorization server/);
-  });
-
-  it('should re-discover when cached metadata lacks deviceAuthorizationEndpoint', async () => {
-    let discoveryCount = 0;
-    const http = mockHttpClient({
-      get: async (url) => {
-        if (url.includes('oauth-protected-resource')) {
-          return { data: { authorization_servers: ['https://auth.example.com'] } };
-        }
-        if (url.includes('oauth-authorization-server')) {
-          discoveryCount++;
-          return {
-            data: {
-              token_endpoint: 'https://auth.example.com/token',
-              registration_endpoint: 'https://auth.example.com/register',
-              device_authorization_endpoint: 'https://auth.example.com/devicecode',
-            },
-          };
-        }
-        return { data: {} };
-      },
-      post: async () => ({ data: { client_id: 'rediscovered-client' } }),
-    });
-
-    const { client, storePath } = createClient(tmpDir, mockCredentialStore(), http);
-
-    await fs.writeFile(
+  it('startSignUp should throw when clientId is not configured', async () => {
+    const storePath = path.join(tmpDir, 'auth.json');
+    const client = new MCPAuthClient({
+      mcpServerUrl: 'https://mcp.test.example.com',
       storePath,
-      JSON.stringify({
-        mcpAuth: {
-          oauthServerUrl: 'https://auth.example.com',
-          tokenEndpoint: 'https://auth.example.com/token',
-          registrationEndpoint: 'https://auth.example.com/register',
+      httpClient: mockHttpClient(),
+      credentialStore: mockCredentialStore(),
+      entraConfig: { authority: TEST_AUTHORITY, scopes: 'openid' },
+    });
+
+    await assert.rejects(() => client.startSignUp('a@b.com'), /client ID not configured/);
+  });
+
+  it('startSignUp should throw when Entra returns redirect challenge', async () => {
+    const { client } = createClient(tmpDir, mockCredentialStore(), mockHttpClient({
+      post: async () => ({ data: { challenge_type: 'redirect' } }),
+    }));
+
+    await assert.rejects(() => client.startSignUp('a@b.com'), /browser-based/);
+  });
+
+  it('challengeSignUp should return OTP challenge details', async () => {
+    const { client } = createClient(tmpDir, mockCredentialStore(), mockHttpClient({
+      post: async () => ({
+        data: {
+          continuation_token: 'ct-challenge-1',
+          code_length: 8,
+          challenge_target_label: 'ag***@example.com',
+          challenge_channel: 'email',
+          challenge_type: 'oob',
         },
       }),
-    );
+    }));
 
-    await client.initialize();
-
-    assert.strictEqual(client.deviceAuthorizationEndpoint, 'https://auth.example.com/devicecode');
-    assert.strictEqual(client.clientId, 'rediscovered-client');
-    assert.strictEqual(discoveryCount, 1);
+    const result = await client.challengeSignUp('ct-signup-1');
+    assert.strictEqual(result.continuationToken, 'ct-challenge-1');
+    assert.strictEqual(result.codeLength, 8);
+    assert.strictEqual(result.challengeChannel, 'email');
+    assert.strictEqual(result.challengeTargetLabel, 'ag***@example.com');
   });
 
-  it('should reuse cached clientId without re-registering', async () => {
-    let postCount = 0;
-    const http = mockHttpClient({
-      get: async (url) => {
-        if (url.includes('oauth-protected-resource')) {
-          return { data: { authorization_servers: ['https://auth.example.com'] } };
-        }
+  it('challengeSignUp should throw when continuationToken is missing', async () => {
+    const { client } = createClient(tmpDir, mockCredentialStore());
+    await assert.rejects(() => client.challengeSignUp(), /continuationToken is required/);
+  });
+
+  it('continueSignUp should submit OTP and return new continuationToken', async () => {
+    const requests = [];
+    const { client } = createClient(tmpDir, mockCredentialStore(), mockHttpClient({
+      post: async (url, body) => {
+        requests.push({ url, body });
+        return { data: { continuation_token: 'ct-continue-1' } };
+      },
+    }));
+
+    const result = await client.continueSignUp('ct-challenge-1', '12345678');
+    assert.strictEqual(result.continuationToken, 'ct-continue-1');
+    assert.ok(requests[0].url.includes('/signup/v1.0/continue'));
+    const params = new URLSearchParams(requests[0].body);
+    assert.strictEqual(params.get('oob'), '12345678');
+    assert.strictEqual(params.get('grant_type'), 'oob');
+  });
+
+  it('continueSignUp should throw when otpCode is missing', async () => {
+    const { client } = createClient(tmpDir, mockCredentialStore());
+    await assert.rejects(() => client.continueSignUp('ct', null), /otpCode is required/);
+  });
+
+  it('completeSignUp should exchange token and persist credentials', async () => {
+    const credStore = mockCredentialStore(true);
+    const requests = [];
+    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
+      post: async (url, body) => {
+        requests.push({ url, body });
         return {
           data: {
-            token_endpoint: 'https://auth.example.com/token',
-            device_authorization_endpoint: 'https://auth.example.com/devicecode',
+            access_token: 'signup-at',
+            refresh_token: 'signup-rt',
+            token_type: 'Bearer',
+            expires_in: 3600,
+            scope: 'openid offline_access',
           },
         };
       },
-      post: async () => {
-        postCount++;
-        return { data: { client_id: 'should-not-register' } };
-      },
-    });
+    }));
 
-    const { client, storePath } = createClient(tmpDir, mockCredentialStore(), http);
-    await fs.writeFile(
+    await client.completeSignUp('ct-continue-1', 'agent@example.com');
+
+    assert.ok(requests[0].url.includes('/oauth2/v2.0/token'));
+    const params = new URLSearchParams(requests[0].body);
+    assert.strictEqual(params.get('grant_type'), 'continuation_token');
+    assert.strictEqual(params.get('username'), 'agent@example.com');
+
+    const secret = JSON.parse(credStore._secrets['mcp.test.example.com']);
+    assert.strictEqual(secret.accessToken, 'signup-at');
+
+    const file = JSON.parse(await fs.readFile(storePath, 'utf8'));
+    assert.strictEqual(file.mcpAuth.email, 'agent@example.com');
+    assert.strictEqual(file.tokens.credentialStore, true);
+  });
+
+  it('completeSignUp should throw when email is missing', async () => {
+    const { client } = createClient(tmpDir, mockCredentialStore());
+    await assert.rejects(() => client.completeSignUp('ct'), /email is required/);
+  });
+
+  it('should use custom authority URL when configured', async () => {
+    const requests = [];
+    const storePath = path.join(tmpDir, 'auth.json');
+    const client = new MCPAuthClient({
+      mcpServerUrl: 'https://mcp.test.example.com',
       storePath,
-      JSON.stringify({
-        mcpAuth: {
-          oauthServerUrl: 'https://auth.example.com',
-          tokenEndpoint: 'https://auth.example.com/token',
-          deviceAuthorizationEndpoint: 'https://auth.example.com/devicecode',
-          clientId: 'cached-client-id',
+      httpClient: mockHttpClient({
+        post: async (url, body) => {
+          requests.push({ url, body });
+          return { data: { continuation_token: 'ct-custom' } };
         },
       }),
+      credentialStore: mockCredentialStore(),
+      entraConfig: {
+        authority: 'https://auth.custom.xyz/mytenant.onmicrosoft.com',
+        clientId: TEST_CLIENT_ID,
+      },
+    });
+
+    await client.startSignUp('a@b.com');
+    assert.ok(
+      requests[0].url.startsWith('https://auth.custom.xyz/mytenant.onmicrosoft.com/'),
+      'should use custom authority, got: ' + requests[0].url,
     );
-
-    await client.initialize();
-
-    assert.strictEqual(client.clientId, 'cached-client-id');
-    assert.strictEqual(postCount, 0);
-  });
-
-  it('should support legacy deviceClientId in store', async () => {
-    let postCount = 0;
-    const http = mockHttpClient({
-      post: async () => {
-        postCount++;
-        return { data: { client_id: 'should-not-register' } };
-      },
-    });
-
-    const { client, storePath } = createClient(tmpDir, mockCredentialStore(), http);
-    await fs.writeFile(
-      storePath,
-      JSON.stringify({
-        mcpAuth: {
-          oauthServerUrl: 'https://auth.example.com',
-          tokenEndpoint: 'https://auth.example.com/token',
-          deviceAuthorizationEndpoint: 'https://auth.example.com/devicecode',
-          deviceClientId: 'legacy-device-id',
-        },
-      }),
-    );
-
-    await client.initialize();
-
-    assert.strictEqual(client.clientId, 'legacy-device-id');
-    assert.strictEqual(postCount, 0);
-  });
-
-  it('should fall back to openid-configuration when oauth-authorization-server is not available', async () => {
-    const requests = { gets: [] };
-    const http = mockHttpClient({
-      get: async (url) => {
-        requests.gets.push(url);
-        if (url.includes('oauth-protected-resource')) {
-          return { data: { authorization_servers: ['https://auth.example.com'] } };
-        }
-        if (url.includes('oauth-authorization-server')) {
-          return { data: {} };
-        }
-        if (url.includes('openid-configuration')) {
-          return {
-            data: {
-              token_endpoint: 'https://auth.example.com/token',
-              registration_endpoint: 'https://auth.example.com/register',
-              device_authorization_endpoint: 'https://auth.example.com/devicecode',
-            },
-          };
-        }
-        return { data: {} };
-      },
-      post: async () => ({ data: { client_id: 'oidc-fallback-client' } }),
-    });
-
-    const { client } = createClient(tmpDir, mockCredentialStore(), http);
-    await client.initialize();
-
-    assert.strictEqual(client.clientId, 'oidc-fallback-client');
-    assert.strictEqual(client.tokenEndpoint, 'https://auth.example.com/token');
-    assert.strictEqual(client.deviceAuthorizationEndpoint, 'https://auth.example.com/devicecode');
-
-    assert.ok(requests.gets.some((u) => u.includes('oauth-authorization-server')));
-    assert.ok(requests.gets.some((u) => u.includes('openid-configuration')));
-  });
-
-  it('should merge device_authorization_endpoint from OIDC when RFC 8414 omits it', async () => {
-    const requests = { gets: [] };
-    const http = mockHttpClient({
-      get: async (url) => {
-        requests.gets.push(url);
-        if (url.includes('oauth-protected-resource')) {
-          return { data: { authorization_servers: ['https://auth.example.com'] } };
-        }
-        if (url.includes('oauth-authorization-server')) {
-          return {
-            data: {
-              token_endpoint: 'https://auth.example.com/token',
-              registration_endpoint: 'https://auth.example.com/register',
-            },
-          };
-        }
-        if (url.includes('openid-configuration')) {
-          return {
-            data: {
-              token_endpoint: 'https://auth.example.com/token',
-              device_authorization_endpoint: 'https://auth.example.com/devicecode',
-            },
-          };
-        }
-        return { data: {} };
-      },
-      post: async () => ({ data: { client_id: 'merged-client' } }),
-    });
-
-    const { client } = createClient(tmpDir, mockCredentialStore(), http);
-    await client.initialize();
-
-    assert.strictEqual(client.deviceAuthorizationEndpoint, 'https://auth.example.com/devicecode');
-    assert.strictEqual(client.tokenEndpoint, 'https://auth.example.com/token');
-    assert.strictEqual(client.registrationEndpoint, 'https://auth.example.com/register');
-
-    assert.ok(requests.gets.some((u) => u.includes('oauth-authorization-server')));
-    assert.ok(requests.gets.some((u) => u.includes('openid-configuration')));
   });
 });
 
-describe('MCPAuthClient - Device Flow (RFC 8628)', () => {
+describe('MCPAuthClient - Sign-in Flow', () => {
   let tmpDir;
 
   beforeEach(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fdx-devtest-'));
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fdx-signintest-'));
   });
 
   afterEach(async () => {
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
-  it('startDeviceFlow should return device code info', async () => {
-    const { client } = createInitializedClient(tmpDir, mockCredentialStore());
+  it('startSignIn should POST to initiate and return continuationToken', async () => {
+    const requests = [];
+    const { client } = createClient(tmpDir, mockCredentialStore(), mockHttpClient({
+      post: async (url, body) => {
+        requests.push({ url, body });
+        return { data: { continuation_token: 'ct-signin-1' } };
+      },
+    }));
 
-    client.httpClient.post = async (url) => {
-      assert.ok(url.includes('/devicecode'));
-      return {
-        data: {
-          device_code: 'device-code-123',
-          user_code: 'ABCD-1234',
-          verification_uri: 'https://microsoft.com/devicelogin',
-          verification_uri_complete: 'https://microsoft.com/devicelogin?otc=ABCD-1234',
-          expires_in: 900,
-          interval: 5,
-        },
-      };
-    };
+    const result = await client.startSignIn('agent@example.com');
 
-    const result = await client.startDeviceFlow();
-    assert.strictEqual(result.deviceCode, 'device-code-123');
-    assert.strictEqual(result.userCode, 'ABCD-1234');
-    assert.strictEqual(result.verificationUri, 'https://microsoft.com/devicelogin');
-    assert.strictEqual(result.expiresIn, 900);
-    assert.strictEqual(result.interval, 5);
+    assert.strictEqual(result.continuationToken, 'ct-signin-1');
+    assert.strictEqual(requests.length, 1);
+    assert.ok(requests[0].url.includes('/oauth2/v2.0/initiate'));
+    const params = new URLSearchParams(requests[0].body);
+    assert.strictEqual(params.get('username'), 'agent@example.com');
+    assert.strictEqual(params.get('client_id'), TEST_CLIENT_ID);
+    assert.strictEqual(params.get('challenge_type'), 'oob redirect');
   });
 
-  it('startDeviceFlow should default interval to 5 when not provided by server', async () => {
-    const { client } = createInitializedClient(tmpDir, mockCredentialStore());
-
-    client.httpClient.post = async () => ({
-      data: { device_code: 'd', user_code: 'U', verification_uri: 'https://v.example.com', expires_in: 900 },
-    });
-
-    const result = await client.startDeviceFlow();
-    assert.strictEqual(result.interval, 5);
+  it('startSignIn should throw when email is missing', async () => {
+    const { client } = createClient(tmpDir, mockCredentialStore());
+    await assert.rejects(() => client.startSignIn(), /email is required/);
   });
 
-  it('pollDeviceToken should succeed after authorization_pending responses', async () => {
-    const credStore = mockCredentialStore();
-    const { client } = createInitializedClient(tmpDir, credStore);
+  it('startSignIn should throw when Entra returns redirect challenge', async () => {
+    const { client } = createClient(tmpDir, mockCredentialStore(), mockHttpClient({
+      post: async () => ({ data: { challenge_type: 'redirect' } }),
+    }));
 
-    let callCount = 0;
-    client.httpClient.post = async () => {
-      callCount++;
-      if (callCount < 3) {
-        const err = new Error('authorization_pending');
-        err.response = { data: { error: 'authorization_pending' } };
-        throw err;
-      }
-      return {
-        data: { access_token: 'device-access', refresh_token: 'device-refresh', token_type: 'Bearer', expires_in: 3600 },
-      };
-    };
-
-    const result = await client.pollDeviceToken({ deviceCode: 'device-code', interval: 0 });
-    assert.strictEqual(result.access_token, 'device-access');
-    assert.strictEqual(callCount, 3);
+    await assert.rejects(() => client.startSignIn('a@b.com'), /browser-based/);
   });
 
-  it('pollDeviceToken should increase poll interval on slow_down', async () => {
-    const { client } = createInitializedClient(tmpDir, mockCredentialStore());
+  it('challengeSignIn should return OTP challenge details', async () => {
+    const { client } = createClient(tmpDir, mockCredentialStore(), mockHttpClient({
+      post: async (url) => {
+        assert.ok(url.includes('/oauth2/v2.0/challenge'));
+        return {
+          data: {
+            continuation_token: 'ct-signin-challenge',
+            code_length: 8,
+            challenge_target_label: 'ag***@example.com',
+            challenge_channel: 'email',
+            challenge_type: 'oob',
+          },
+        };
+      },
+    }));
 
-    let callCount = 0;
-    client.httpClient.post = async () => {
-      callCount++;
-      if (callCount === 1) {
-        const err = new Error('slow_down');
-        err.response = { data: { error: 'slow_down' } };
-        throw err;
-      }
-      return {
-        data: { access_token: 'token-after-slowdown', token_type: 'Bearer', expires_in: 3600 },
-      };
-    };
-
-    const result = await client.pollDeviceToken({ deviceCode: 'device-code', interval: 0 });
-    assert.strictEqual(result.access_token, 'token-after-slowdown');
-    assert.strictEqual(callCount, 2);
+    const result = await client.challengeSignIn('ct-signin-1');
+    assert.strictEqual(result.continuationToken, 'ct-signin-challenge');
+    assert.strictEqual(result.codeLength, 8);
+    assert.strictEqual(result.challengeChannel, 'email');
   });
 
-  it('pollDeviceToken should throw on access_denied', async () => {
-    const { client } = createInitializedClient(tmpDir, mockCredentialStore());
-
-    client.httpClient.post = async () => {
-      const err = new Error('access_denied');
-      err.response = { data: { error: 'access_denied' } };
-      throw err;
-    };
-
-    await assert.rejects(
-      () => client.pollDeviceToken({ deviceCode: 'device-code', interval: 0 }),
-      /access denied/i,
-    );
+  it('challengeSignIn should throw when continuationToken is missing', async () => {
+    const { client } = createClient(tmpDir, mockCredentialStore());
+    await assert.rejects(() => client.challengeSignIn(), /continuationToken is required/);
   });
 
-  it('pollDeviceToken should throw on expired_token', async () => {
-    const { client } = createInitializedClient(tmpDir, mockCredentialStore());
+  it('challengeSignIn should throw when Entra returns redirect', async () => {
+    const { client } = createClient(tmpDir, mockCredentialStore(), mockHttpClient({
+      post: async () => ({ data: { challenge_type: 'redirect' } }),
+    }));
 
-    client.httpClient.post = async () => {
-      const err = new Error('expired_token');
-      err.response = { data: { error: 'expired_token' } };
-      throw err;
-    };
-
-    await assert.rejects(
-      () => client.pollDeviceToken({ deviceCode: 'device-code', interval: 0 }),
-      /expired/i,
-    );
+    await assert.rejects(() => client.challengeSignIn('ct'), /browser-based/);
   });
 
-  it('pollDeviceToken should throw when deadline is exceeded', async () => {
-    const { client } = createInitializedClient(tmpDir, mockCredentialStore());
+  it('completeSignIn should submit OTP and persist tokens', async () => {
+    const credStore = mockCredentialStore(true);
+    const requests = [];
+    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
+      post: async (url, body) => {
+        requests.push({ url, body });
+        return {
+          data: {
+            access_token: 'signin-at',
+            refresh_token: 'signin-rt',
+            token_type: 'Bearer',
+            expires_in: 3600,
+            scope: 'openid offline_access',
+          },
+        };
+      },
+    }));
 
-    client.httpClient.post = async () => {
-      const err = new Error('authorization_pending');
-      err.response = { data: { error: 'authorization_pending' } };
-      throw err;
-    };
+    await client.completeSignIn('ct-signin-challenge', '87654321', 'agent@example.com');
 
-    await assert.rejects(
-      () => client.pollDeviceToken({ deviceCode: 'device-code', interval: 0, expiresIn: 0 }),
-      /expired/i,
-    );
-  });
-
-  it('pollDeviceToken should store tokens in credential store on success', async () => {
-    const credStore = mockCredentialStore();
-    const { client } = createInitializedClient(tmpDir, credStore);
-
-    client.httpClient.post = async () => ({
-      data: { access_token: 'device-at', refresh_token: 'device-rt', token_type: 'Bearer', expires_in: 3600 },
-    });
-
-    await client.pollDeviceToken({ deviceCode: 'device-code', interval: 0 });
+    assert.ok(requests[0].url.includes('/oauth2/v2.0/token'));
+    const params = new URLSearchParams(requests[0].body);
+    assert.strictEqual(params.get('grant_type'), 'oob');
+    assert.strictEqual(params.get('oob'), '87654321');
 
     const secret = JSON.parse(credStore._secrets['mcp.test.example.com']);
-    assert.strictEqual(secret.accessToken, 'device-at');
-    assert.strictEqual(secret.refreshToken, 'device-rt');
+    assert.strictEqual(secret.accessToken, 'signin-at');
+    assert.strictEqual(secret.refreshToken, 'signin-rt');
+
+    const file = JSON.parse(await fs.readFile(storePath, 'utf8'));
+    assert.strictEqual(file.mcpAuth.email, 'agent@example.com');
+    assert.strictEqual(file.tokens.credentialStore, true);
+  });
+
+  it('completeSignIn should throw when otpCode is missing', async () => {
+    const { client } = createClient(tmpDir, mockCredentialStore());
+    await assert.rejects(() => client.completeSignIn('ct', null), /otpCode is required/);
+  });
+
+  it('completeSignIn should throw when continuationToken is missing', async () => {
+    const { client } = createClient(tmpDir, mockCredentialStore());
+    await assert.rejects(() => client.completeSignIn(null, '123'), /continuationToken is required/);
   });
 });
 
@@ -1119,51 +705,37 @@ describe('MCPAuthClient - logout()', () => {
 
   it('should delete the secret from the credential store', async () => {
     const credStore = mockCredentialStore();
-    const { client, storePath } = createInitializedClient(tmpDir, credStore);
+    const { client, storePath } = createClient(tmpDir, credStore);
 
     credStore.setSecret('mcp.test.example.com', JSON.stringify({ accessToken: 'at', refreshToken: 'rt' }));
-    await fs.writeFile(storePath, JSON.stringify({ mcpAuth: { clientId: 'cid' }, tokens: { accessToken: 'at' } }));
+    await fs.writeFile(storePath, JSON.stringify({ mcpAuth: { email: 'a@b.com' }, tokens: { accessToken: 'at' } }));
 
     await client.logout();
 
     assert.strictEqual(credStore.getSecret('mcp.test.example.com'), null);
   });
 
-  it('should remove tokens from the store file but keep mcpAuth', async () => {
+  it('should remove tokens from the store file and clear mcpAuth', async () => {
     const credStore = mockCredentialStore();
-    const { client, storePath } = createInitializedClient(tmpDir, credStore);
+    const { client, storePath } = createClient(tmpDir, credStore);
 
     await fs.writeFile(
       storePath,
-      JSON.stringify({ mcpAuth: { clientId: 'cid' }, tokens: { accessToken: 'at' } }),
+      JSON.stringify({ mcpAuth: { email: 'a@b.com' }, tokens: { accessToken: 'at' } }),
     );
 
     await client.logout();
 
     const file = JSON.parse(await fs.readFile(storePath, 'utf8'));
-    assert.ok(file.mcpAuth, 'mcpAuth should be preserved');
-    assert.strictEqual(file.mcpAuth.clientId, 'cid');
+    assert.strictEqual(file.mcpAuth, undefined, 'mcpAuth should be removed');
     assert.strictEqual(file.tokens, undefined, 'tokens should be removed');
-  });
-
-  it('should reset in-memory initialization flags', async () => {
-    const credStore = mockCredentialStore();
-    const { client, storePath } = createInitializedClient(tmpDir, credStore);
-
-    client._discovered = true;
-
-    await fs.writeFile(storePath, JSON.stringify({}));
-    await client.logout();
-
-    assert.strictEqual(client._initialized, false);
-    assert.strictEqual(client._discovered, false);
   });
 
   it('should not throw when no secret is stored (unauthenticated)', async () => {
     const credStore = mockCredentialStore();
     const { client, storePath } = createClient(tmpDir, credStore);
 
-    await fs.writeFile(storePath, JSON.stringify({ mcpAuth: { clientId: 'cid' } }));
+    await fs.writeFile(storePath, JSON.stringify({ mcpAuth: { email: 'a@b.com' } }));
 
     await assert.doesNotReject(() => client.logout());
   });
@@ -1173,5 +745,147 @@ describe('MCPAuthClient - logout()', () => {
     const { client } = createClient(tmpDir, credStore);
 
     await assert.doesNotReject(() => client.logout());
+  });
+
+  it('should clear pending verification secret and state', async () => {
+    const credStore = mockCredentialStore();
+    const { client, storePath } = createClient(tmpDir, credStore);
+
+    credStore.setSecret('mcp.test.example.com/pending', 'ct-pending');
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({
+        tokens: { accessToken: 'at' },
+        pendingVerification: { email: 'a@b.com', flow: 'register', credentialStore: true },
+      }),
+    );
+
+    await client.logout();
+
+    assert.strictEqual(credStore.getSecret('mcp.test.example.com/pending'), null);
+    const file = JSON.parse(await fs.readFile(storePath, 'utf8'));
+    assert.strictEqual(file.pendingVerification, undefined);
+  });
+});
+
+describe('MCPAuthClient - Pending Verification', () => {
+  let tmpDir;
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fdx-pendingtest-'));
+  });
+
+  afterEach(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('should store continuation token in credential store', async () => {
+    const credStore = mockCredentialStore(true);
+    const { client, storePath } = createClient(tmpDir, credStore);
+
+    await client.savePendingVerification({
+      continuationToken: 'ct-pending-123',
+      email: 'user@example.com',
+      flow: 'register',
+    });
+
+    assert.strictEqual(credStore.getSecret('mcp.test.example.com/pending'), 'ct-pending-123');
+    const file = JSON.parse(await fs.readFile(storePath, 'utf8'));
+    assert.strictEqual(file.pendingVerification.email, 'user@example.com');
+    assert.strictEqual(file.pendingVerification.flow, 'register');
+    assert.strictEqual(file.pendingVerification.credentialStore, true);
+    assert.strictEqual(file.pendingVerification.continuationToken, undefined);
+  });
+
+  it('should fall back to state file when credential store unavailable', async () => {
+    const credStore = mockCredentialStore(false);
+    const { client, storePath } = createClient(tmpDir, credStore);
+
+    await client.savePendingVerification({
+      continuationToken: 'ct-fallback',
+      email: 'user@example.com',
+      flow: 'login',
+    });
+
+    const file = JSON.parse(await fs.readFile(storePath, 'utf8'));
+    assert.strictEqual(file.pendingVerification.continuationToken, 'ct-fallback');
+    assert.strictEqual(file.pendingVerification.credentialStore, undefined);
+  });
+
+  it('should retrieve pending verification from credential store', async () => {
+    const credStore = mockCredentialStore(true);
+    const { client, storePath } = createClient(tmpDir, credStore);
+
+    credStore.setSecret('mcp.test.example.com/pending', 'ct-stored');
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({
+        pendingVerification: { email: 'user@example.com', flow: 'register', credentialStore: true },
+      }),
+    );
+
+    const pending = await client.getPendingVerification();
+    assert.strictEqual(pending.continuationToken, 'ct-stored');
+    assert.strictEqual(pending.email, 'user@example.com');
+    assert.strictEqual(pending.flow, 'register');
+  });
+
+  it('should retrieve pending verification from state file fallback', async () => {
+    const credStore = mockCredentialStore(false);
+    const { client, storePath } = createClient(tmpDir, credStore);
+
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({
+        pendingVerification: { email: 'user@example.com', flow: 'login', continuationToken: 'ct-file' },
+      }),
+    );
+
+    const pending = await client.getPendingVerification();
+    assert.strictEqual(pending.continuationToken, 'ct-file');
+    assert.strictEqual(pending.email, 'user@example.com');
+    assert.strictEqual(pending.flow, 'login');
+  });
+
+  it('should return null when no pending verification exists', async () => {
+    const credStore = mockCredentialStore(true);
+    const { client } = createClient(tmpDir, credStore);
+
+    const pending = await client.getPendingVerification();
+    assert.strictEqual(pending, null);
+  });
+
+  it('should return null when credential store has no token', async () => {
+    const credStore = mockCredentialStore(true);
+    const { client, storePath } = createClient(tmpDir, credStore);
+
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({
+        pendingVerification: { email: 'user@example.com', flow: 'register', credentialStore: true },
+      }),
+    );
+
+    const pending = await client.getPendingVerification();
+    assert.strictEqual(pending, null);
+  });
+
+  it('should clear pending verification from both stores', async () => {
+    const credStore = mockCredentialStore(true);
+    const { client, storePath } = createClient(tmpDir, credStore);
+
+    credStore.setSecret('mcp.test.example.com/pending', 'ct-to-clear');
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({
+        pendingVerification: { email: 'user@example.com', flow: 'register', credentialStore: true },
+      }),
+    );
+
+    await client.clearPendingVerification();
+
+    assert.strictEqual(credStore.getSecret('mcp.test.example.com/pending'), null);
+    const file = JSON.parse(await fs.readFile(storePath, 'utf8'));
+    assert.strictEqual(file.pendingVerification, undefined);
   });
 });

@@ -2,7 +2,7 @@ const { MCPAuthClient } = require('./mcp-auth');
 const { MCPClient } = require('./mcp-client');
 
 class WalletClient {
-  constructor({ mcpServerUrl, storePath, httpClient }) {
+  constructor({ mcpServerUrl, storePath, httpClient, entraConfig }) {
     if (!mcpServerUrl) throw new Error('mcpServerUrl is required');
     if (!storePath) throw new Error('storePath is required');
 
@@ -10,6 +10,7 @@ class WalletClient {
       mcpServerUrl,
       storePath,
       httpClient,
+      entraConfig,
     });
 
     this.mcpClient = new MCPClient({
@@ -18,17 +19,49 @@ class WalletClient {
     });
   }
 
-  async initialize() {
-    return this.authClient.initialize();
+  // -- Sign-up (register) flow -----------------------------------------------
+
+  async register(email) {
+    const { continuationToken } = await this.authClient.startSignUp(email);
+    const challenge = await this.authClient.challengeSignUp(continuationToken);
+    await this.authClient.savePendingVerification({
+      continuationToken: challenge.continuationToken,
+      email,
+      flow: 'register',
+    });
+    return challenge;
   }
 
-  async startDeviceFlow() {
-    return this.authClient.startDeviceFlow();
+  async verifyRegistration(continuationToken, otpCode, email) {
+    const { continuationToken: tokenCt } = await this.authClient.continueSignUp(
+      continuationToken,
+      otpCode,
+    );
+    const result = await this.authClient.completeSignUp(tokenCt, email);
+    await this.authClient.clearPendingVerification();
+    return result;
   }
 
-  async pollDeviceToken({ deviceCode, interval, expiresIn }) {
-    return this.authClient.pollDeviceToken({ deviceCode, interval, expiresIn });
+  // -- Sign-in (login) flow ---------------------------------------------------
+
+  async login(email) {
+    const { continuationToken } = await this.authClient.startSignIn(email);
+    const challenge = await this.authClient.challengeSignIn(continuationToken);
+    await this.authClient.savePendingVerification({
+      continuationToken: challenge.continuationToken,
+      email,
+      flow: 'login',
+    });
+    return challenge;
   }
+
+  async verifyLogin(continuationToken, otpCode, email) {
+    const result = await this.authClient.completeSignIn(continuationToken, otpCode, email);
+    await this.authClient.clearPendingVerification();
+    return result;
+  }
+
+  // -- Token state & lifecycle ------------------------------------------------
 
   async getTokenState() {
     return this.authClient.getTokenState();

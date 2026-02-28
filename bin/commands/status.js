@@ -21,7 +21,7 @@ module.exports = async function status() {
     console.log(pc.yellow('Status: not authenticated'));
     console.log(`  ${pc.dim('MCP server:')}  ${mcpServer}`);
     console.log(`  ${pc.dim('Store path:')} ${storePath}`);
-    console.log(`  Run ${pc.cyan('"fdx login"')} to authenticate.`);
+    console.log(`  Run ${pc.cyan('"fdx register"')} or ${pc.cyan('"fdx login"')} to authenticate.`);
     process.exit(1);
   }
 
@@ -29,7 +29,7 @@ module.exports = async function status() {
   console.log(`Status: ${statusLabel}`);
   console.log(`  ${pc.dim('MCP server:')}    ${mcpServer}`);
   console.log(`  ${pc.dim('Store path:')}    ${storePath}`);
-  console.log(`  ${pc.dim('Client ID:')}     ${state.clientId || 'unknown'}`);
+  console.log(`  ${pc.dim('Email:')}          ${state.email || 'unknown'}`);
   console.log(
     `  ${pc.dim('Token expires:')}  ${state.expiresAt ? new Date(state.expiresAt).toISOString() : 'unknown'}`,
   );
@@ -44,7 +44,7 @@ module.exports = async function status() {
     console.log('');
     console.log(
       pc.red('Token expired and no refresh token.') +
-        ` Run ${pc.cyan('"fdx login"')} to re-authenticate.`,
+        ` Run ${pc.cyan('"fdx login --email <email>"')} to re-authenticate.`,
     );
     process.exit(1);
   }

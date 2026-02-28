@@ -4,6 +4,9 @@ const path = require('path');
 const { WalletClient } = require('./wallet-client');
 
 const DEFAULT_MCP_SERVER = 'https://mcp.fd.xyz';
+const DEFAULT_ENTRA_AUTHORITY = 'https://auth.fd.xyz/financedistrict.onmicrosoft.com';
+const DEFAULT_ENTRA_CLIENT_ID = '77109def-1265-40e2-93e0-20051cd9a186';
+const DEFAULT_ENTRA_SCOPES = 'api://fd-agent-wallet-mcp/mcp:tools openid offline_access';
 
 function createClientFromEnv() {
   const mcpServerUrl = process.env.FDX_MCP_SERVER || DEFAULT_MCP_SERVER;
@@ -21,6 +24,11 @@ function createClientFromEnv() {
   return new WalletClient({
     mcpServerUrl,
     storePath: storePath || path.join(os.homedir(), '.fdx', 'auth.json'),
+    entraConfig: {
+      authority: DEFAULT_ENTRA_AUTHORITY,
+      clientId: DEFAULT_ENTRA_CLIENT_ID,
+      scopes: DEFAULT_ENTRA_SCOPES,
+    },
   });
 }
 

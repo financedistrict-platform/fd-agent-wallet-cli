@@ -56,8 +56,8 @@ const METHOD_INFO = {
     category: 'Wallet',
     description: 'Get wallet balances and overview across chains',
     params: {
-      accountAddress: { type: 'string', desc: 'Filter by account address (0x... or Base58)' },
-      chainKey: { type: 'string', desc: 'Filter by chain (e.g. bsc, ethereum, solana)' },
+      accountAddress: { type: 'string', desc: 'Filter by account address (0x..., Base58, or Bitcoin)' },
+      chainKey: { type: 'string', desc: 'Filter by chain (e.g. bitcoin, bsc, ethereum, solana)' },
     },
   },
   getAccountActivity: {
@@ -71,12 +71,12 @@ const METHOD_INFO = {
   },
   transferTokens: {
     category: 'Transfer',
-    description: 'Transfer tokens to any address (EVM or Solana)',
+    description: 'Transfer tokens to any address (EVM, Solana, or Bitcoin)',
     params: {
       toAddress: { required: true, type: 'string', desc: 'Recipient address or ENS/SNS name', example: '0xRecipient...or vitalik.eth' },
       amount: { required: true, type: 'number', desc: 'Amount to transfer (decimal)', example: '10' },
-      asset: { required: true, type: 'string', desc: 'Asset symbol (e.g. ETH, USDC, SOL) or contract address', example: 'USDC' },
-      chainKey: { required: true, type: 'string', desc: 'Blockchain identifier (e.g. bsc, ethereum, solana)', example: 'ethereum' },
+      asset: { required: true, type: 'string', desc: 'Asset symbol (e.g. BTC, ETH, USDC, SOL) or contract address', example: 'USDC' },
+      chainKey: { required: true, type: 'string', desc: 'Blockchain identifier (e.g. bitcoin, bsc, ethereum, solana)', example: 'ethereum' },
       fromAccountAddress: { type: 'string', desc: 'Source wallet address (auto-selected if omitted)' },
       autoApprove: { type: 'boolean', desc: 'Auto-approve up to configured limit (default: false)' },
     },

@@ -49,6 +49,7 @@ FDX is a three-layer system that gives AI agents secure access to blockchain wal
 │  • X-402 payment protocol support                                   │
 │                                                                     │
 │  Supported Chains:                                                  │
+│  • Bitcoin                                                          │
 │  • Ethereum (1)                                                     │
 │  • BNB Smart Chain (56)                                             │
 │  • Arbitrum One (42161)                                             │
@@ -74,7 +75,7 @@ The remote server (hosted at fd.xyz) provides:
 
 - **Authentication**: OAuth 2.1 with Microsoft Entra ID (no local keys)
 - **Smart Accounts**: EVM account abstraction via ERC-4337, deterministic Solana addresses
-- **Multi-Chain Support**: Single interface for ETH, BSC, ARB, BASE, SOL
+- **Multi-Chain Support**: Single interface for BTC, ETH, BSC, ARB, BASE, SOL
 - **DeFi Integration**: Swap tokens via DEX aggregators, earn yield via Aave/Compound/Yearn
 - **Payment Protocol**: X-402 payment authorization for premium API access
 
@@ -133,13 +134,14 @@ No private keys, no seed phrases. All wallet operations are server-side with use
 
 FDX abstracts chain differences behind a single API:
 
-| Chain    | Chain ID | Network Key | Address Format |
-| -------- | -------- | ----------- | -------------- |
-| Ethereum | 1        | ethereum    | 0x...          |
-| BSC      | 56       | bsc         | 0x...          |
-| Arbitrum | 42161    | arbitrum    | 0x...          |
-| Base     | 8453     | base        | 0x...          |
-| Solana   | (CAIP-2) | solana      | base58         |
+| Chain    | Chain ID | Network Key | Address Format       |
+|----------|----------|-------------|----------------------|
+| Bitcoin  | —        | bitcoin     | bc1... / 1... / 3... |
+| Ethereum | 1        | ethereum    | 0x...                |
+| BSC      | 56       | bsc         | 0x...                |
+| Arbitrum | 42161    | arbitrum    | 0x...                |
+| Base     | 8453     | base        | 0x...                |
+| Solana   | (CAIP-2) | solana      | base58               |
 
 ## DeFi Integration
 

@@ -31,7 +31,7 @@ Verify the `fdx` command is available:
 fdx
 ```
 
-Should print usage info with `register`, `login`, `verify`, `status`, `call` commands.
+Should print usage info with `register`, `login`, `verify`, `status`, `wallet`, and `prism` commands.
 
 ## 3. Register and authenticate
 
@@ -50,12 +50,14 @@ This will:
 ## 4. Verify the CLI works
 
 ```bash
-fdx status
-fdx call getMyInfo
-fdx call getAppVersion
+fdx status                       # auth status
+fdx wallet call getMyInfo        # account info
+fdx wallet call getAppVersion    # server version
+fdx wallet call                  # list all available wallet tools
+fdx prism call                   # discover prism tools (fetched from server)
 ```
 
-All three should return data. If `fdx call` fails with auth errors, run `fdx login --email you@example.com` and `fdx verify --code <OTP>` again.
+All commands should return data. Run `fdx wallet call` or `fdx prism call` without arguments to see the full list of available tools. If auth errors occur, run `fdx login --email you@example.com` and `fdx verify --code <OTP>` again.
 
 ## 5. Environment Variables
 
@@ -78,7 +80,7 @@ The CLI defaults to the production server. To point it at a different environmen
 
 ```bash
 FDX_MCP_SERVER=https://... fdx login --email you@example.com
-FDX_MCP_SERVER=https://... fdx call getMyInfo
+FDX_MCP_SERVER=https://... fdx wallet call getMyInfo
 ```
 
 **Option B — shell export (current session):**
@@ -86,7 +88,7 @@ FDX_MCP_SERVER=https://... fdx call getMyInfo
 ```bash
 export FDX_MCP_SERVER=https://...
 fdx login --email you@example.com
-fdx call getMyInfo
+fdx wallet call getMyInfo
 ```
 
 **Option C — `.env` file (persistent, local only):**
@@ -134,5 +136,5 @@ npm run lint:fix  # auto-fix
 | Problem                   | Fix                                                                                |
 | ------------------------- | ---------------------------------------------------------------------------------- |
 | `fdx: command not found`  | Run `npm link` in the repo directory                                               |
-| Auth errors on `fdx call` | Run `fdx login --email you@example.com` then `fdx verify --code <OTP>`             |
+| Auth errors on `fdx wallet/prism call` | Run `fdx login --email you@example.com` then `fdx verify --code <OTP>` |
 | Token expired             | Auto-refreshes via refresh token. If that also expired, run `fdx login` again      |

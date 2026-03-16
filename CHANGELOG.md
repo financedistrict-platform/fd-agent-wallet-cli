@@ -5,6 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-03-16
+
+### Added
+
+- `fdx wallet call <method>` — Wallet MCP tools (transfers, swaps, yield, X402 payments)
+- `fdx prism call <method>` — Prism Platform tools with dynamic server discovery
+- `fdx servers` — list available MCP servers and their URLs
+- Multi-server routing — CLI routes tool calls to Wallet or Prism based on subcommand
+- `FDX_WALLET_MCP_URL` / `FDX_PRISM_MCP_URL` env vars for per-server URL overrides
+
+### Changed
+
+- **BREAKING**: `WalletClient` renamed to `FdxClient` in SDK exports — no backward-compat alias
+- Updated all documentation examples to use new `fdx wallet call` and `fdx prism call` syntax
+
+### Deprecated
+
+- `fdx call <method>` — use `fdx wallet call <method>` or `fdx prism call <method>` instead (exits with error)
+- `FDX_MCP_SERVER` env var — use per-server env vars (`FDX_WALLET_MCP_URL`, `FDX_PRISM_MCP_URL`)
+
+### Fixed
+
+- Tool routing ambiguity resolved by requiring explicit server selection
+
+### Migration
+
+**CLI commands:**
+
+```bash
+# Before (v0.3.x)
+fdx call getMyInfo
+fdx call getTokenPrice --token ETH
+
+# After (v0.4.0)
+fdx wallet call getMyInfo
+fdx wallet call getTokenPrice --token ETH
+fdx prism call listPayments          # new: Prism tools
+fdx servers                          # list available servers
+```
+
+**SDK imports:**
+
+```js
+// Before (v0.3.x)
+const { WalletClient } = require('@financedistrict/fdx');
+
+// After (v0.4.0)
+const { FdxClient } = require('@financedistrict/fdx');
+```
+
+**Environment variables:**
+
+```bash
+# Before (v0.3.x)
+export FDX_MCP_SERVER=https://custom-server.example.com
+
+# After (v0.4.0)
+export FDX_WALLET_MCP_URL=https://custom-wallet.example.com
+export FDX_PRISM_MCP_URL=https://custom-prism.example.com
+```
+
+**AI agent operators:** Update tool invocation configs from `fdx call <method>` to `fdx wallet call <method>`. Prism tools now available via `fdx prism call`.
+
 ## [0.3.1] - 2026-02-28
 
 ### Fixed

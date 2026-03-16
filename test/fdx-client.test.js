@@ -1,11 +1,11 @@
 const assert = require('node:assert');
 const { describe, it } = require('node:test');
 
-const { WalletClient } = require('../src/wallet-client');
+const { FdxClient } = require('../src/fdx-client');
 
 function createClient() {
   const calls = [];
-  const client = new WalletClient({
+  const client = new FdxClient({
     mcpServerUrl: 'https://mcp.example.com',
     storePath: '/tmp/fdx-test.json',
   });
@@ -19,12 +19,12 @@ function createClient() {
   return { client, calls };
 }
 
-describe('WalletClient', () => {
+describe('FdxClient', () => {
   describe('constructor', () => {
     it('should throw if mcpServerUrl is missing', () => {
       assert.throws(
         () =>
-          new WalletClient({
+          new FdxClient({
             storePath: '/tmp/test.json',
           }),
         /mcpServerUrl is required/,
@@ -34,7 +34,7 @@ describe('WalletClient', () => {
     it('should throw if storePath is missing', () => {
       assert.throws(
         () =>
-          new WalletClient({
+          new FdxClient({
             mcpServerUrl: 'https://example.com',
           }),
         /storePath is required/,
@@ -66,7 +66,11 @@ describe('WalletClient', () => {
 
     it('discoverYieldStrategies should forward params', async () => {
       const { client, calls } = createClient();
-      await client.discoverYieldStrategies({ chainKey: 'base', token: 'USDC', protocolSlug: 'aave-v3' });
+      await client.discoverYieldStrategies({
+        chainKey: 'base',
+        token: 'USDC',
+        protocolSlug: 'aave-v3',
+      });
       assert.strictEqual(calls[0].toolName, 'discoverYieldStrategies');
       assert.strictEqual(calls[0].args.chainKey, 'base');
       assert.strictEqual(calls[0].args.token, 'USDC');
@@ -124,10 +128,7 @@ describe('WalletClient', () => {
     it('transferTokens should validate required fields', async () => {
       const { client } = createClient();
       await assert.rejects(() => client.transferTokens({}), /toAddress is required/);
-      await assert.rejects(
-        () => client.transferTokens({ toAddress: '0x1' }),
-        /amount is required/,
-      );
+      await assert.rejects(() => client.transferTokens({ toAddress: '0x1' }), /amount is required/);
       await assert.rejects(
         () => client.transferTokens({ toAddress: '0x1', amount: 1 }),
         /asset is required/,
@@ -204,11 +205,22 @@ describe('WalletClient', () => {
         /token is required/,
       );
       await assert.rejects(
-        () => client.depositForYield({ strategyId: 'aave-usdc', fromAccountAddress: '0x1', token: 'USDC' }),
+        () =>
+          client.depositForYield({
+            strategyId: 'aave-usdc',
+            fromAccountAddress: '0x1',
+            token: 'USDC',
+          }),
         /amount is required/,
       );
       await assert.rejects(
-        () => client.depositForYield({ strategyId: 'aave-usdc', fromAccountAddress: '0x1', token: 'USDC', amount: 10 }),
+        () =>
+          client.depositForYield({
+            strategyId: 'aave-usdc',
+            fromAccountAddress: '0x1',
+            token: 'USDC',
+            amount: 10,
+          }),
         /chainKey is required/,
       );
     });
@@ -242,11 +254,22 @@ describe('WalletClient', () => {
         /withdrawAmount is required/,
       );
       await assert.rejects(
-        () => client.withdrawFromYield({ vaultTokenAddress: '0xVAULT', underlyingToken: 'USDC', withdrawAmount: 50 }),
+        () =>
+          client.withdrawFromYield({
+            vaultTokenAddress: '0xVAULT',
+            underlyingToken: 'USDC',
+            withdrawAmount: 50,
+          }),
         /fromAccountAddress is required/,
       );
       await assert.rejects(
-        () => client.withdrawFromYield({ vaultTokenAddress: '0xVAULT', underlyingToken: 'USDC', withdrawAmount: 50, fromAccountAddress: '0x1' }),
+        () =>
+          client.withdrawFromYield({
+            vaultTokenAddress: '0xVAULT',
+            underlyingToken: 'USDC',
+            withdrawAmount: 50,
+            fromAccountAddress: '0x1',
+          }),
         /chainKey is required/,
       );
     });

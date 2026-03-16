@@ -1,8 +1,8 @@
 ﻿const axios = require('axios');
 
 const defaultCredentialStore = require('./credential-store');
-const logger = require('./utils/logger');
 const { readStore, writeStore } = require('./storage');
+const logger = require('./utils/logger');
 
 /**
  * Entra External ID Native Authentication client.
@@ -73,7 +73,9 @@ class MCPAuthClient {
     });
 
     if (data.challenge_type === 'redirect') {
-      throw new Error('Entra requires browser-based authentication — native auth may not be enabled for this app');
+      throw new Error(
+        'Entra requires browser-based authentication — native auth may not be enabled for this app',
+      );
     }
 
     logger.info('mcp-auth: sign-up started', { email });
@@ -196,7 +198,9 @@ class MCPAuthClient {
     });
 
     if (data.challenge_type === 'redirect') {
-      throw new Error('Entra requires browser-based authentication — native auth may not be enabled for this app');
+      throw new Error(
+        'Entra requires browser-based authentication — native auth may not be enabled for this app',
+      );
     }
 
     logger.info('mcp-auth: sign-in initiated', { email });

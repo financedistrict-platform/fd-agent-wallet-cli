@@ -16,19 +16,17 @@ FDX is a three-layer system that gives AI agents secure access to blockchain wal
 │                       FDX npm Package                               │
 │                   (@financedistrict/fdx)                   │
 │                                                                     │
-│  ┌─────────────────┐                                               │
-│  │  CLI Commands   │                                               │
-│  │                 │                                               │
-│  │  • fdx register │                                               │
-│  │  • fdx login    │                                               │
-│  │  • fdx verify   │                                               │
-│  │  • fdx status   │                                               │
-│  │  • fdx call     │                                               │
-│  │    <method>     │                                               │
-│  └─────────────────┘                                               │
+│  ┌─────────────────────────────────────┐                           │
+│  │  CLI Commands                       │                           │
+│  │                                     │                           │
+│  │  • fdx register, login, verify      │                           │
+│  │  • fdx status                       │                           │
+│  │  • fdx wallet call <method>         │                           │
+│  │  • fdx prism call <method>          │                           │
+│  └─────────────────────────────────────┘                           │
 │                                                                     │
 │  ┌──────────────────────────────────────────────────────────────┐  │
-│  │              WalletClient (SDK)                              │  │
+│  │              FdxClient (SDK)                                 │  │
 │  │  • Email OTP authentication via Entra Native Auth               │  │
 │  │  • JSON-RPC 2.0 MCP protocol client                         │  │
 │  │  • High-level methods for wallet/DeFi operations             │  │
@@ -65,7 +63,7 @@ FDX is a three-layer system that gives AI agents secure access to blockchain wal
 The npm package includes:
 
 - **CLI Tool** (`bin/fdx.js`): Command-line interface for setup, status checks, and method invocation
-- **SDK** (`src/wallet-client.js`): High-level JavaScript API with typed methods for each MCP tool
+- **SDK** (`src/fdx-client.js`): High-level JavaScript API with typed methods for each MCP tool
 - **OAuth Client** (`src/mcp-auth.js`): Entra External ID Native Authentication — headless email OTP sign-up and sign-in
 - **MCP Client** (`src/mcp-client.js`): JSON-RPC 2.0 protocol handler with SSE response format
 
@@ -84,13 +82,32 @@ The remote server (hosted at fd.xyz) provides:
 ### Example: Agent Checks Wallet Balance
 
 1. **User asks agent**: _"What's my ETH balance?"_
-2. **Agent invokes CLI**: `fdx call getWalletOverview --chainKey ethereum`
-3. **CLI loads SDK**: `bin/commands/call.js` → `src/wallet-client.js` → `getWalletOverview()`
+2. **Agent invokes CLI**: `fdx wallet call getWalletOverview --chainKey ethereum`
+3. **CLI loads SDK**: `bin/commands/wallet-call.js` → `src/fdx-client.js` → `getWalletOverview()`
 4. **SDK authenticates**: Reads OAuth tokens from `~/.fdx/auth.json`
 5. **SDK calls MCP**: HTTPS request to `mcp.fd.xyz` with JSON-RPC 2.0 payload
 6. **Server queries chain**: Fetches balances from Ethereum RPC nodes
 7. **Response flows back**: JSON → SDK → CLI → stdout → Agent reads JSON
 8. **Agent formats answer**: _"You have 0.42 ETH in your Ethereum wallet (0xABC...)"_
+
+### Example: Agent Lists Prism Payments
+
+1. **User asks agent**: _"Show me recent payments"_
+2. **Agent invokes CLI**: `fdx prism call listPayments`
+3. **CLI loads handler**: `bin/commands/prism-call.js` → `createClientFromEnv('prism')`
+4. **SDK authenticates**: Same Entra OAuth tokens (shared auth)
+5. **SDK calls MCP**: HTTPS request to `prism-mcp.fd.xyz` via `mcpClient.callTool()`
+6. **Server returns data**: JSON result with payment records
+7. **Agent parses output**: Formats payments for user
+
+### Example: Dynamic Tool Discovery
+
+```bash
+fdx prism call               # → mcpClient.listTools() → displays all tools
+fdx prism call <tool> --help  # → mcpClient.listTools() → renders inputSchema as help
+```
+
+Unlike wallet tools (hardcoded `METHOD_INFO` with 15+ tools), prism tools are fetched from the server at runtime. New server-side tools appear automatically without CLI updates — run `fdx prism call` to discover what's available.
 
 ## Authentication Flow
 
@@ -151,7 +168,7 @@ The MCP server integrates with DeFi protocols:
 - **Yield Strategies**: Aave (lending), Compound (lending), Yearn (vaults)
 - **Smart Routing**: Policy-driven swap execution (BestExecution, LowGas, MevProtected)
 
-Agents can discover strategies, deposit tokens, and withdraw yield — all through `fdx call`.
+Agents can discover strategies, deposit tokens, and withdraw yield — run `fdx wallet call` to see all available tools, or `fdx wallet call <tool> --help` for parameter details.
 
 ## Development & Testing
 

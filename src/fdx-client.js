@@ -1,7 +1,7 @@
 const { MCPAuthClient } = require('./mcp-auth');
 const { MCPClient } = require('./mcp-client');
 
-class WalletClient {
+class FdxClient {
   constructor({ mcpServerUrl, storePath, httpClient, entraConfig }) {
     if (!mcpServerUrl) throw new Error('mcpServerUrl is required');
     if (!storePath) throw new Error('storePath is required');
@@ -271,4 +271,4 @@ class WalletClient {
   }
 }
 
-module.exports = { WalletClient };
+module.exports = { FdxClient };

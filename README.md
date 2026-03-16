@@ -8,7 +8,7 @@ A command-line interface to the [Finance District](https://fd.xyz) MCP wallet se
 
 ## Why FDX?
 
-FDX is designed for AI agents and agent frameworks that need wallet tooling but don't natively support the [Model Context Protocol (MCP)](https://modelcontextprotocol.io). Instead of integrating an MCP client, agents invoke `fdx call <method>` from the command line and parse JSON output.
+FDX is designed for AI agents and agent frameworks that need wallet and platform tooling but don't natively support the [Model Context Protocol (MCP)](https://modelcontextprotocol.io). Instead of integrating an MCP client, agents invoke `fdx wallet call <method>` or `fdx prism call <method>` from the command line and parse JSON output.
 
 - **No Key Management** — Email OTP authentication. No seed phrases. No private key files.
 - **Agent-Native** — Structured JSON input/output designed for tool-calling agents.
@@ -95,26 +95,40 @@ Removes stored tokens from the OS credential store and clears `~/.fdx/auth.json`
 
 ## Usage
 
-Invoke any MCP tool via the CLI:
+Invoke any MCP tool via the CLI using service subcommands:
+
+### Wallet Tools
 
 ```bash
-# Check wallet overview
-fdx call getWalletOverview --chainKey ethereum
-
-# Send tokens
-fdx call transferTokens --chainKey ethereum --recipientAddress 0xABC... --amount 0.1
-
-# Discover yield strategies
-fdx call discoverYieldStrategies --chainKey base
+fdx wallet call                                    # list all available wallet tools
+fdx wallet call getMyInfo                          # account info
+fdx wallet call getWalletOverview --chainKey ethereum  # balances
+fdx wallet call getTokenPrice --token ETH          # price check
+fdx wallet call transferTokens --toAddress 0xABC... --amount 10 --asset USDC --chainKey ethereum
+fdx wallet call discoverYieldStrategies --chainKey base
+fdx wallet call getTokenPrice --help               # show params for a tool
+# ... 15+ tools available — run fdx wallet call to see the full list
 ```
+
+### Prism Platform Tools
+
+Prism tools are discovered dynamically from the server at runtime — new server-side tools appear automatically without CLI updates.
+
+```bash
+fdx prism call                                     # discover all prism tools (fetched live from server)
+fdx prism call listPayments                        # invoke a tool
+fdx prism call listPayments --help                 # show params from server inputSchema
+# ... tools are auto-discovered — run fdx prism call to see what's available
+```
+
+### JSON Output
 
 All output is JSON, making it easy for agents to parse:
 
 ```bash
-fdx call getMyInfo | jq '.email'
+fdx wallet call getMyInfo | jq '.email'
+fdx prism call listPayments | jq '.[0].status'
 ```
-
-Run `fdx call` without arguments to see all available methods.
 
 ## SDK Usage
 
@@ -123,23 +137,38 @@ FDX can also be used as a Node.js library:
 ```js
 const { createClientFromEnv } = require('@financedistrict/fdx');
 
-const client = createClientFromEnv();
-const result = await client.getWalletOverview({ chainKey: 'ethereum' });
+// Wallet — typed convenience methods
+const wallet = createClientFromEnv('wallet');
+const balance = await wallet.getWalletOverview({ chainKey: 'ethereum' });
+console.log(balance.data);
+await wallet.close();
+
+// Prism — dynamic tool calls via MCPClient
+const prism = createClientFromEnv('prism');
+await prism.mcpClient.connect();
+const tools = await prism.mcpClient.listTools();          // discover tools
+const result = await prism.mcpClient.callTool('listPayments', {});
 console.log(result.data);
+await prism.close();
 ```
 
 ## Configuration
 
-| Environment Variable | Description        | Default                                |
-| -------------------- | ------------------ | -------------------------------------- |
-| `FDX_MCP_SERVER`     | MCP server URL     | `https://mcp.fd.xyz`                   |
-| `FDX_STORE_PATH`     | Token store path   | `~/.fdx/auth.json`                     |
-| `FDX_LOG_PATH`       | Log file path      | `~/.fdx/fdx.log`                       |
-| `FDX_LOG_LEVEL`      | Log verbosity (`debug`\|`info`\|`warn`\|`error`\|`off`) | `info` |
+| Environment Variable | Scope | Default |
+| -------------------- | ----- | ------- |
+| `FDX_WALLET_MCP_URL` | Wallet MCP server URL | `https://mcp.fd.xyz` |
+| `FDX_PRISM_MCP_URL` | Prism MCP server URL | `https://prism-mcp.fd.xyz` |
+| `FDX_MCP_SERVER` | Global fallback (all services) | — |
+| `FDX_STORE_PATH` | Token store path | `~/.fdx/auth.json` |
+| `FDX_LOG_PATH` | Log file path | `~/.fdx/fdx.log` |
+| `FDX_LOG_LEVEL` | Log verbosity (`debug`\|`info`\|`warn`\|`error`\|`off`) | `info` |
+
+See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for per-environment setup (staging, local dev, `.env` files).
 
 ## Documentation
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — System design overview
+- [docs/CONFIGURATION.md](docs/CONFIGURATION.md) — Environment variables and per-server URL setup
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — Running from source
 - [docs/UNINSTALL.md](docs/UNINSTALL.md) — Removal instructions
 

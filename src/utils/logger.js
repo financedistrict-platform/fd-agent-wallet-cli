@@ -1,8 +1,8 @@
 'use strict';
 
 const fs = require('fs');
-const path = require('path');
 const os = require('os');
+const path = require('path');
 
 const LEVELS = { debug: 0, info: 1, warn: 2, error: 3, off: 4 };
 const MAX_BYTES = 5 * 1024 * 1024; // rotate at 5 MB, keep one backup

@@ -64,17 +64,21 @@ describe('MCPAuthClient - Credential Store Integration', () => {
 
   it('should store tokens in credential store when available', async () => {
     const credStore = mockCredentialStore(true);
-    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
-      post: async () => ({
-        data: {
-          access_token: 'access-123',
-          refresh_token: 'refresh-456',
-          token_type: 'Bearer',
-          expires_in: 3600,
-          scope: 'openid',
-        },
+    const { client, storePath } = createClient(
+      tmpDir,
+      credStore,
+      mockHttpClient({
+        post: async () => ({
+          data: {
+            access_token: 'access-123',
+            refresh_token: 'refresh-456',
+            token_type: 'Bearer',
+            expires_in: 3600,
+            scope: 'openid',
+          },
+        }),
       }),
-    }));
+    );
 
     await client.completeSignIn('ct-123', 'otp-code', 'user@example.com');
 
@@ -91,16 +95,20 @@ describe('MCPAuthClient - Credential Store Integration', () => {
 
   it('should fall back to file when credential store is not available', async () => {
     const credStore = mockCredentialStore(false);
-    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
-      post: async () => ({
-        data: {
-          access_token: 'access-plain',
-          refresh_token: 'refresh-plain',
-          token_type: 'Bearer',
-          expires_in: 3600,
-        },
+    const { client, storePath } = createClient(
+      tmpDir,
+      credStore,
+      mockHttpClient({
+        post: async () => ({
+          data: {
+            access_token: 'access-plain',
+            refresh_token: 'refresh-plain',
+            token_type: 'Bearer',
+            expires_in: 3600,
+          },
+        }),
       }),
-    }));
+    );
 
     const warnings = [];
     const handler = (w) => warnings.push(w);
@@ -197,17 +205,16 @@ describe('MCPAuthClient - Credential Store Integration', () => {
       }),
     );
 
-    await assert.rejects(
-      () => client.getAccessToken(),
-      /credential store is unavailable/,
-    );
+    await assert.rejects(() => client.getAccessToken(), /credential store is unavailable/);
   });
 
   it('should throw when credential store throws during read', async () => {
     const credStore = mockCredentialStore(true);
     const { client, storePath } = createClient(tmpDir, credStore);
 
-    credStore.getSecret = () => { throw new Error('dbus connection failed'); };
+    credStore.getSecret = () => {
+      throw new Error('dbus connection failed');
+    };
 
     await fs.writeFile(
       storePath,
@@ -220,23 +227,24 @@ describe('MCPAuthClient - Credential Store Integration', () => {
       }),
     );
 
-    await assert.rejects(
-      () => client.getAccessToken(),
-      /credential store is unavailable/,
-    );
+    await assert.rejects(() => client.getAccessToken(), /credential store is unavailable/);
   });
 
   it('should preserve refresh token during token refresh', async () => {
     const credStore = mockCredentialStore(true);
-    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
-      post: async () => ({
-        data: {
-          access_token: 'new-access',
-          token_type: 'Bearer',
-          expires_in: 3600,
-        },
+    const { client, storePath } = createClient(
+      tmpDir,
+      credStore,
+      mockHttpClient({
+        post: async () => ({
+          data: {
+            access_token: 'new-access',
+            token_type: 'Bearer',
+            expires_in: 3600,
+          },
+        }),
       }),
-    }));
+    );
 
     credStore._secrets['mcp.test.example.com'] = JSON.stringify({
       accessToken: 'old-access',
@@ -265,16 +273,20 @@ describe('MCPAuthClient - Credential Store Integration', () => {
   it('should send refresh_token grant to Entra token endpoint', async () => {
     let postCount = 0;
     const credStore = mockCredentialStore(true);
-    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
-      post: async (url, body) => {
-        postCount++;
-        assert.ok(url.includes('/oauth2/v2.0/token'), 'should POST to Entra token endpoint');
-        const params = new URLSearchParams(body);
-        assert.strictEqual(params.get('grant_type'), 'refresh_token');
-        assert.strictEqual(params.get('client_id'), TEST_CLIENT_ID);
-        return { data: { access_token: 'new-at', token_type: 'Bearer', expires_in: 3600 } };
-      },
-    }));
+    const { client, storePath } = createClient(
+      tmpDir,
+      credStore,
+      mockHttpClient({
+        post: async (url, body) => {
+          postCount++;
+          assert.ok(url.includes('/oauth2/v2.0/token'), 'should POST to Entra token endpoint');
+          const params = new URLSearchParams(body);
+          assert.strictEqual(params.get('grant_type'), 'refresh_token');
+          assert.strictEqual(params.get('client_id'), TEST_CLIENT_ID);
+          return { data: { access_token: 'new-at', token_type: 'Bearer', expires_in: 3600 } };
+        },
+      }),
+    );
 
     credStore._secrets['mcp.test.example.com'] = JSON.stringify({
       accessToken: 'old-at',
@@ -305,10 +317,7 @@ describe('MCPAuthClient - Credential Store Integration', () => {
       accessToken: 'old-at',
       refreshToken: 'my-refresh-token',
     });
-    await fs.writeFile(
-      storePath,
-      JSON.stringify({ tokens: { credentialStore: true } }),
-    );
+    await fs.writeFile(storePath, JSON.stringify({ tokens: { credentialStore: true } }));
 
     await assert.rejects(() => client.refreshToken(), /No client ID/);
   });
@@ -413,12 +422,16 @@ describe('MCPAuthClient - Sign-up Flow', () => {
 
   it('startSignUp should POST to signup/start and return continuationToken', async () => {
     const requests = [];
-    const { client } = createClient(tmpDir, mockCredentialStore(), mockHttpClient({
-      post: async (url, body) => {
-        requests.push({ url, body });
-        return { data: { continuation_token: 'ct-signup-1' } };
-      },
-    }));
+    const { client } = createClient(
+      tmpDir,
+      mockCredentialStore(),
+      mockHttpClient({
+        post: async (url, body) => {
+          requests.push({ url, body });
+          return { data: { continuation_token: 'ct-signup-1' } };
+        },
+      }),
+    );
 
     const result = await client.startSignUp('agent@example.com');
 
@@ -449,25 +462,33 @@ describe('MCPAuthClient - Sign-up Flow', () => {
   });
 
   it('startSignUp should throw when Entra returns redirect challenge', async () => {
-    const { client } = createClient(tmpDir, mockCredentialStore(), mockHttpClient({
-      post: async () => ({ data: { challenge_type: 'redirect' } }),
-    }));
+    const { client } = createClient(
+      tmpDir,
+      mockCredentialStore(),
+      mockHttpClient({
+        post: async () => ({ data: { challenge_type: 'redirect' } }),
+      }),
+    );
 
     await assert.rejects(() => client.startSignUp('a@b.com'), /browser-based/);
   });
 
   it('challengeSignUp should return OTP challenge details', async () => {
-    const { client } = createClient(tmpDir, mockCredentialStore(), mockHttpClient({
-      post: async () => ({
-        data: {
-          continuation_token: 'ct-challenge-1',
-          code_length: 8,
-          challenge_target_label: 'ag***@example.com',
-          challenge_channel: 'email',
-          challenge_type: 'oob',
-        },
+    const { client } = createClient(
+      tmpDir,
+      mockCredentialStore(),
+      mockHttpClient({
+        post: async () => ({
+          data: {
+            continuation_token: 'ct-challenge-1',
+            code_length: 8,
+            challenge_target_label: 'ag***@example.com',
+            challenge_channel: 'email',
+            challenge_type: 'oob',
+          },
+        }),
       }),
-    }));
+    );
 
     const result = await client.challengeSignUp('ct-signup-1');
     assert.strictEqual(result.continuationToken, 'ct-challenge-1');
@@ -483,12 +504,16 @@ describe('MCPAuthClient - Sign-up Flow', () => {
 
   it('continueSignUp should submit OTP and return new continuationToken', async () => {
     const requests = [];
-    const { client } = createClient(tmpDir, mockCredentialStore(), mockHttpClient({
-      post: async (url, body) => {
-        requests.push({ url, body });
-        return { data: { continuation_token: 'ct-continue-1' } };
-      },
-    }));
+    const { client } = createClient(
+      tmpDir,
+      mockCredentialStore(),
+      mockHttpClient({
+        post: async (url, body) => {
+          requests.push({ url, body });
+          return { data: { continuation_token: 'ct-continue-1' } };
+        },
+      }),
+    );
 
     const result = await client.continueSignUp('ct-challenge-1', '12345678');
     assert.strictEqual(result.continuationToken, 'ct-continue-1');
@@ -506,20 +531,24 @@ describe('MCPAuthClient - Sign-up Flow', () => {
   it('completeSignUp should exchange token and persist credentials', async () => {
     const credStore = mockCredentialStore(true);
     const requests = [];
-    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
-      post: async (url, body) => {
-        requests.push({ url, body });
-        return {
-          data: {
-            access_token: 'signup-at',
-            refresh_token: 'signup-rt',
-            token_type: 'Bearer',
-            expires_in: 3600,
-            scope: 'openid offline_access',
-          },
-        };
-      },
-    }));
+    const { client, storePath } = createClient(
+      tmpDir,
+      credStore,
+      mockHttpClient({
+        post: async (url, body) => {
+          requests.push({ url, body });
+          return {
+            data: {
+              access_token: 'signup-at',
+              refresh_token: 'signup-rt',
+              token_type: 'Bearer',
+              expires_in: 3600,
+              scope: 'openid offline_access',
+            },
+          };
+        },
+      }),
+    );
 
     await client.completeSignUp('ct-continue-1', 'agent@example.com');
 
@@ -581,12 +610,16 @@ describe('MCPAuthClient - Sign-in Flow', () => {
 
   it('startSignIn should POST to initiate and return continuationToken', async () => {
     const requests = [];
-    const { client } = createClient(tmpDir, mockCredentialStore(), mockHttpClient({
-      post: async (url, body) => {
-        requests.push({ url, body });
-        return { data: { continuation_token: 'ct-signin-1' } };
-      },
-    }));
+    const { client } = createClient(
+      tmpDir,
+      mockCredentialStore(),
+      mockHttpClient({
+        post: async (url, body) => {
+          requests.push({ url, body });
+          return { data: { continuation_token: 'ct-signin-1' } };
+        },
+      }),
+    );
 
     const result = await client.startSignIn('agent@example.com');
 
@@ -605,28 +638,36 @@ describe('MCPAuthClient - Sign-in Flow', () => {
   });
 
   it('startSignIn should throw when Entra returns redirect challenge', async () => {
-    const { client } = createClient(tmpDir, mockCredentialStore(), mockHttpClient({
-      post: async () => ({ data: { challenge_type: 'redirect' } }),
-    }));
+    const { client } = createClient(
+      tmpDir,
+      mockCredentialStore(),
+      mockHttpClient({
+        post: async () => ({ data: { challenge_type: 'redirect' } }),
+      }),
+    );
 
     await assert.rejects(() => client.startSignIn('a@b.com'), /browser-based/);
   });
 
   it('challengeSignIn should return OTP challenge details', async () => {
-    const { client } = createClient(tmpDir, mockCredentialStore(), mockHttpClient({
-      post: async (url) => {
-        assert.ok(url.includes('/oauth2/v2.0/challenge'));
-        return {
-          data: {
-            continuation_token: 'ct-signin-challenge',
-            code_length: 8,
-            challenge_target_label: 'ag***@example.com',
-            challenge_channel: 'email',
-            challenge_type: 'oob',
-          },
-        };
-      },
-    }));
+    const { client } = createClient(
+      tmpDir,
+      mockCredentialStore(),
+      mockHttpClient({
+        post: async (url) => {
+          assert.ok(url.includes('/oauth2/v2.0/challenge'));
+          return {
+            data: {
+              continuation_token: 'ct-signin-challenge',
+              code_length: 8,
+              challenge_target_label: 'ag***@example.com',
+              challenge_channel: 'email',
+              challenge_type: 'oob',
+            },
+          };
+        },
+      }),
+    );
 
     const result = await client.challengeSignIn('ct-signin-1');
     assert.strictEqual(result.continuationToken, 'ct-signin-challenge');
@@ -640,9 +681,13 @@ describe('MCPAuthClient - Sign-in Flow', () => {
   });
 
   it('challengeSignIn should throw when Entra returns redirect', async () => {
-    const { client } = createClient(tmpDir, mockCredentialStore(), mockHttpClient({
-      post: async () => ({ data: { challenge_type: 'redirect' } }),
-    }));
+    const { client } = createClient(
+      tmpDir,
+      mockCredentialStore(),
+      mockHttpClient({
+        post: async () => ({ data: { challenge_type: 'redirect' } }),
+      }),
+    );
 
     await assert.rejects(() => client.challengeSignIn('ct'), /browser-based/);
   });
@@ -650,20 +695,24 @@ describe('MCPAuthClient - Sign-in Flow', () => {
   it('completeSignIn should submit OTP and persist tokens', async () => {
     const credStore = mockCredentialStore(true);
     const requests = [];
-    const { client, storePath } = createClient(tmpDir, credStore, mockHttpClient({
-      post: async (url, body) => {
-        requests.push({ url, body });
-        return {
-          data: {
-            access_token: 'signin-at',
-            refresh_token: 'signin-rt',
-            token_type: 'Bearer',
-            expires_in: 3600,
-            scope: 'openid offline_access',
-          },
-        };
-      },
-    }));
+    const { client, storePath } = createClient(
+      tmpDir,
+      credStore,
+      mockHttpClient({
+        post: async (url, body) => {
+          requests.push({ url, body });
+          return {
+            data: {
+              access_token: 'signin-at',
+              refresh_token: 'signin-rt',
+              token_type: 'Bearer',
+              expires_in: 3600,
+              scope: 'openid offline_access',
+            },
+          };
+        },
+      }),
+    );
 
     await client.completeSignIn('ct-signin-challenge', '87654321', 'agent@example.com');
 
@@ -707,8 +756,14 @@ describe('MCPAuthClient - logout()', () => {
     const credStore = mockCredentialStore();
     const { client, storePath } = createClient(tmpDir, credStore);
 
-    credStore.setSecret('mcp.test.example.com', JSON.stringify({ accessToken: 'at', refreshToken: 'rt' }));
-    await fs.writeFile(storePath, JSON.stringify({ mcpAuth: { email: 'a@b.com' }, tokens: { accessToken: 'at' } }));
+    credStore.setSecret(
+      'mcp.test.example.com',
+      JSON.stringify({ accessToken: 'at', refreshToken: 'rt' }),
+    );
+    await fs.writeFile(
+      storePath,
+      JSON.stringify({ mcpAuth: { email: 'a@b.com' }, tokens: { accessToken: 'at' } }),
+    );
 
     await client.logout();
 
@@ -837,7 +892,11 @@ describe('MCPAuthClient - Pending Verification', () => {
     await fs.writeFile(
       storePath,
       JSON.stringify({
-        pendingVerification: { email: 'user@example.com', flow: 'login', continuationToken: 'ct-file' },
+        pendingVerification: {
+          email: 'user@example.com',
+          flow: 'login',
+          continuationToken: 'ct-file',
+        },
       }),
     );
 

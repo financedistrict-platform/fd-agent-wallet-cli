@@ -1,7 +1,8 @@
-const createSpinner = require('./spinner');
 const pc = require('picocolors');
 
 const { createClientFromEnv } = require('../../src');
+
+const createSpinner = require('./spinner');
 
 module.exports = async function login({ email }) {
   if (!email) {
@@ -42,9 +43,7 @@ module.exports = async function login({ email }) {
   console.log(`  ${pc.dim('Code length:')}  ${challenge.codeLength} digits`);
   console.log(pc.bold('─'.repeat(58)));
   console.log('');
-  console.log(
-    `Check your email and run: ${pc.cyan('fdx verify --code <OTP_CODE>')}`,
-  );
+  console.log(`Check your email and run: ${pc.cyan('fdx verify --code <OTP_CODE>')}`);
   console.log('');
 
   // Output machine-readable JSON for agent consumption

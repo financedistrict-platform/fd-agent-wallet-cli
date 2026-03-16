@@ -1,8 +1,9 @@
-const createSpinner = require('./spinner');
 const pc = require('picocolors');
 
 const { createClientFromEnv } = require('../../src');
 const { parseArgs } = require('../../src/utils/args');
+
+const createSpinner = require('./spinner');
 
 /* -------------------------------------------------------------------------- */
 /*  Method metadata — drives METHODS list, --help, and validation hints       */
@@ -13,7 +14,12 @@ const METHOD_INFO = {
     category: 'Wallet',
     description: 'Look up current USD price and 24h change for a token',
     params: {
-      token: { required: true, type: 'string', desc: 'Token ticker symbol (e.g. BTC, ETH, USDC)', example: 'ETH' },
+      token: {
+        required: true,
+        type: 'string',
+        desc: 'Token ticker symbol (e.g. BTC, ETH, USDC)',
+        example: 'ETH',
+      },
     },
   },
   getMyInfo: {
@@ -28,7 +34,12 @@ const METHOD_INFO = {
     category: 'Support',
     description: 'Ask a conceptual question about wallet safety, keys, fees, etc.',
     params: {
-      question: { required: true, type: 'string', desc: 'Your question', example: 'What are gas fees?' },
+      question: {
+        required: true,
+        type: 'string',
+        desc: 'Your question',
+        example: 'What are gas fees?',
+      },
       tone: { type: 'string', desc: 'Response style: friendly, concise, formal, developer' },
       locale: { type: 'string', desc: 'Response locale (e.g. en-US, en-GB)' },
     },
@@ -37,7 +48,12 @@ const METHOD_INFO = {
     category: 'Support',
     description: 'Interactive onboarding guide for wallet setup',
     params: {
-      question: { required: true, type: 'string', desc: 'Your question or setup step', example: 'How do I fund my wallet?' },
+      question: {
+        required: true,
+        type: 'string',
+        desc: 'Your question or setup step',
+        example: 'How do I fund my wallet?',
+      },
       context: { type: 'string', desc: 'Additional context (JSON string)' },
       tone: { type: 'string', desc: 'Response style: friendly, concise, formal, developer' },
       locale: { type: 'string', desc: 'Response locale (e.g. en-US, en-GB)' },
@@ -47,8 +63,18 @@ const METHOD_INFO = {
     category: 'Support',
     description: 'Report a bug or issue (creates a GitHub issue)',
     params: {
-      title: { required: true, type: 'string', desc: 'Issue title', example: 'Transfer failed on BSC' },
-      description: { required: true, type: 'string', desc: 'Detailed issue description', example: 'Error when sending USDC...' },
+      title: {
+        required: true,
+        type: 'string',
+        desc: 'Issue title',
+        example: 'Transfer failed on BSC',
+      },
+      description: {
+        required: true,
+        type: 'string',
+        desc: 'Detailed issue description',
+        example: 'Error when sending USDC...',
+      },
       labels: { type: 'string', desc: 'Comma-separated labels (e.g. bug, mcp-tool)' },
     },
   },
@@ -56,7 +82,10 @@ const METHOD_INFO = {
     category: 'Wallet',
     description: 'Get wallet balances and overview across chains',
     params: {
-      accountAddress: { type: 'string', desc: 'Filter by account address (0x..., Base58, or Bitcoin)' },
+      accountAddress: {
+        type: 'string',
+        desc: 'Filter by account address (0x..., Base58, or Bitcoin)',
+      },
       chainKey: { type: 'string', desc: 'Filter by chain (e.g. bitcoin, bsc, ethereum, solana)' },
     },
   },
@@ -64,39 +93,106 @@ const METHOD_INFO = {
     category: 'Wallet',
     description: 'Get transaction history for an account on a chain',
     params: {
-      accountAddress: { required: true, type: 'string', desc: 'Account address to query', example: '0x1234...abcd' },
-      chainKey: { required: true, type: 'string', desc: 'Blockchain identifier', example: 'ethereum' },
-      maxTransactions: { type: 'integer', desc: 'Max transactions to return (default: 25, max: 100)' },
+      accountAddress: {
+        required: true,
+        type: 'string',
+        desc: 'Account address to query',
+        example: '0x1234...abcd',
+      },
+      chainKey: {
+        required: true,
+        type: 'string',
+        desc: 'Blockchain identifier',
+        example: 'ethereum',
+      },
+      maxTransactions: {
+        type: 'integer',
+        desc: 'Max transactions to return (default: 25, max: 100)',
+      },
     },
   },
   transferTokens: {
     category: 'Transfer',
     description: 'Transfer tokens to any address (EVM, Solana, or Bitcoin)',
     params: {
-      toAddress: { required: true, type: 'string', desc: 'Recipient address or ENS/SNS name', example: '0xRecipient...or vitalik.eth' },
-      amount: { required: true, type: 'number', desc: 'Amount to transfer (decimal)', example: '10' },
-      asset: { required: true, type: 'string', desc: 'Asset symbol (e.g. BTC, ETH, USDC, SOL) or contract address', example: 'USDC' },
-      chainKey: { required: true, type: 'string', desc: 'Blockchain identifier (e.g. bitcoin, bsc, ethereum, solana)', example: 'ethereum' },
-      fromAccountAddress: { type: 'string', desc: 'Source wallet address (auto-selected if omitted)' },
-      autoApprove: { type: 'boolean', desc: 'Auto-approve up to configured limit (default: false)' },
+      toAddress: {
+        required: true,
+        type: 'string',
+        desc: 'Recipient address or ENS/SNS name',
+        example: '0xRecipient...or vitalik.eth',
+      },
+      amount: {
+        required: true,
+        type: 'number',
+        desc: 'Amount to transfer (decimal)',
+        example: '10',
+      },
+      asset: {
+        required: true,
+        type: 'string',
+        desc: 'Asset symbol (e.g. BTC, ETH, USDC, SOL) or contract address',
+        example: 'USDC',
+      },
+      chainKey: {
+        required: true,
+        type: 'string',
+        desc: 'Blockchain identifier (e.g. bitcoin, bsc, ethereum, solana)',
+        example: 'ethereum',
+      },
+      fromAccountAddress: {
+        type: 'string',
+        desc: 'Source wallet address (auto-selected if omitted)',
+      },
+      autoApprove: {
+        type: 'boolean',
+        desc: 'Auto-approve up to configured limit (default: false)',
+      },
     },
   },
   resolveNameService: {
     category: 'Transfer',
     description: 'Resolve ENS/SNS/Unstoppable Domain names to addresses (or reverse)',
     params: {
-      nameOrAddress: { required: true, type: 'string', desc: 'Name (e.g. vitalik.eth, bonfida.sol) or address to resolve', example: 'vitalik.eth' },
+      nameOrAddress: {
+        required: true,
+        type: 'string',
+        desc: 'Name (e.g. vitalik.eth, bonfida.sol) or address to resolve',
+        example: 'vitalik.eth',
+      },
     },
   },
   swapTokens: {
     category: 'Swap',
     description: 'Quote or execute a token swap',
     params: {
-      chainKey: { required: true, type: 'string', desc: 'Blockchain identifier', example: 'ethereum' },
-      tokenIn: { required: true, type: 'string', desc: 'Token to sell (e.g. USDC, ETH)', example: 'USDC' },
-      tokenOut: { required: true, type: 'string', desc: 'Token to buy (e.g. USDC, ETH)', example: 'ETH' },
-      amount: { required: true, type: 'number', desc: 'Amount of tokenIn to swap (decimal)', example: '100' },
-      objective: { type: 'string', desc: 'Objective: Immediate, BestExecution, LowGas, MevProtected' },
+      chainKey: {
+        required: true,
+        type: 'string',
+        desc: 'Blockchain identifier',
+        example: 'ethereum',
+      },
+      tokenIn: {
+        required: true,
+        type: 'string',
+        desc: 'Token to sell (e.g. USDC, ETH)',
+        example: 'USDC',
+      },
+      tokenOut: {
+        required: true,
+        type: 'string',
+        desc: 'Token to buy (e.g. USDC, ETH)',
+        example: 'ETH',
+      },
+      amount: {
+        required: true,
+        type: 'number',
+        desc: 'Amount of tokenIn to swap (decimal)',
+        example: '100',
+      },
+      objective: {
+        type: 'string',
+        desc: 'Objective: Immediate, BestExecution, LowGas, MevProtected',
+      },
       maxSlippageBps: { type: 'integer', desc: 'Max slippage in basis points (default: 50)' },
       deadlineSeconds: { type: 'integer', desc: 'Deadline in seconds (default: 120)' },
       mode: { type: 'string', desc: 'Mode: QuoteOnly or Execute (default: QuoteOnly)' },
@@ -108,7 +204,10 @@ const METHOD_INFO = {
     params: {
       chainKey: { type: 'string', desc: 'Filter by chain (e.g. bsc, base, ethereum)' },
       token: { type: 'string', desc: 'Filter by token (e.g. USDC, WETH, or 0x...)' },
-      protocolSlug: { type: 'string', desc: 'Filter by protocol (e.g. aave-v3, venus, compound-v3)' },
+      protocolSlug: {
+        type: 'string',
+        desc: 'Filter by protocol (e.g. aave-v3, venus, compound-v3)',
+      },
       sortBy: { type: 'string', desc: 'Sort field: apy or risk (default: apy)' },
       sortDirection: { type: 'string', desc: 'Sort direction: desc or asc (default: desc)' },
       limit: { type: 'integer', desc: 'Max results 1-100 (default: 30)' },
@@ -118,10 +217,30 @@ const METHOD_INFO = {
     category: 'Yield',
     description: 'Deposit tokens into a DeFi yield strategy',
     params: {
-      strategyId: { required: true, type: 'string', desc: 'Strategy ID from discoverYieldStrategies', example: 'aave-v3-usdc-base' },
-      fromAccountAddress: { required: true, type: 'string', desc: 'Account address to deposit from', example: '0x1234...abcd' },
-      token: { required: true, type: 'string', desc: 'Token to deposit (e.g. USDC, WETH, or 0x...)', example: 'USDC' },
-      amount: { required: true, type: 'number', desc: 'Amount to deposit (decimal)', example: '500' },
+      strategyId: {
+        required: true,
+        type: 'string',
+        desc: 'Strategy ID from discoverYieldStrategies',
+        example: 'aave-v3-usdc-base',
+      },
+      fromAccountAddress: {
+        required: true,
+        type: 'string',
+        desc: 'Account address to deposit from',
+        example: '0x1234...abcd',
+      },
+      token: {
+        required: true,
+        type: 'string',
+        desc: 'Token to deposit (e.g. USDC, WETH, or 0x...)',
+        example: 'USDC',
+      },
+      amount: {
+        required: true,
+        type: 'number',
+        desc: 'Amount to deposit (decimal)',
+        example: '500',
+      },
       chainKey: { required: true, type: 'string', desc: 'Blockchain identifier', example: 'base' },
     },
   },
@@ -129,10 +248,30 @@ const METHOD_INFO = {
     category: 'Yield',
     description: 'Withdraw tokens from a DeFi yield position',
     params: {
-      vaultTokenAddress: { required: true, type: 'string', desc: 'Vault token address (0x...)', example: '0xVault...addr' },
-      underlyingToken: { required: true, type: 'string', desc: 'Token to receive (e.g. USDC, WETH)', example: 'USDC' },
-      withdrawAmount: { required: true, type: 'number', desc: 'Amount of vault tokens to withdraw (decimal)', example: '250' },
-      fromAccountAddress: { required: true, type: 'string', desc: 'Account holding the vault tokens', example: '0x1234...abcd' },
+      vaultTokenAddress: {
+        required: true,
+        type: 'string',
+        desc: 'Vault token address (0x...)',
+        example: '0xVault...addr',
+      },
+      underlyingToken: {
+        required: true,
+        type: 'string',
+        desc: 'Token to receive (e.g. USDC, WETH)',
+        example: 'USDC',
+      },
+      withdrawAmount: {
+        required: true,
+        type: 'number',
+        desc: 'Amount of vault tokens to withdraw (decimal)',
+        example: '250',
+      },
+      fromAccountAddress: {
+        required: true,
+        type: 'string',
+        desc: 'Account holding the vault tokens',
+        example: '0x1234...abcd',
+      },
       chainKey: { required: true, type: 'string', desc: 'Blockchain identifier', example: 'base' },
     },
   },
@@ -140,7 +279,12 @@ const METHOD_INFO = {
     category: 'Payment',
     description: 'Authorize an X-402 payment from a 402 response',
     params: {
-      paymentRequirementsResponseJson: { required: true, type: 'string', desc: 'JSON-serialized PaymentRequirementsResponse from server', example: '{"accepts":[...]}' },
+      paymentRequirementsResponseJson: {
+        required: true,
+        type: 'string',
+        desc: 'JSON-serialized PaymentRequirementsResponse from server',
+        example: '{"accepts":[...]}',
+      },
       autoApprove: { type: 'boolean', desc: 'Auto-approve best option (default: false)' },
     },
   },
@@ -148,7 +292,12 @@ const METHOD_INFO = {
     category: 'Payment',
     description: 'Fetch content from an X-402 protocol API',
     params: {
-      url: { required: true, type: 'string', desc: 'API endpoint URL supporting X-402', example: 'https://api.example.com/data' },
+      url: {
+        required: true,
+        type: 'string',
+        desc: 'API endpoint URL supporting X-402',
+        example: 'https://api.example.com/data',
+      },
       maxPaymentAmount: { type: 'string', desc: 'Maximum payment amount (decimal string)' },
       preferredAsset: { type: 'string', desc: 'Preferred payment asset (e.g. FDUSD, USDC)' },
       preferredNetwork: { type: 'string', desc: 'Preferred network identifier' },
@@ -185,8 +334,10 @@ function findClosestMethod(input) {
   if (substringMatches.length === 1) return substringMatches[0];
 
   // Levenshtein distance for typo correction
-  const scored = METHODS.map((m) => ({ method: m, dist: levenshtein(lower, m.toLowerCase()) }))
-    .sort((a, b) => a.dist - b.dist);
+  const scored = METHODS.map((m) => ({
+    method: m,
+    dist: levenshtein(lower, m.toLowerCase()),
+  })).sort((a, b) => a.dist - b.dist);
 
   // Only suggest if the best match is reasonably close (< 40% of the longer string)
   const best = scored[0];
@@ -204,9 +355,10 @@ function levenshtein(a, b) {
   for (let j = 0; j <= n; j++) dp[0][j] = j;
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      dp[i][j] = a[i - 1] === b[j - 1]
-        ? dp[i - 1][j - 1]
-        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      dp[i][j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
     }
   }
   return dp[m][n];
@@ -217,7 +369,7 @@ function levenshtein(a, b) {
 /* -------------------------------------------------------------------------- */
 
 function showMethodsList(hint) {
-  console.log(`Usage: fdx call ${pc.cyan('<method>')} [--param value ...]`);
+  console.log(`Usage: fdx wallet call ${pc.cyan('<method>')} [--param value ...]`);
   console.log('');
 
   // Group methods by category
@@ -252,7 +404,7 @@ function showMethodsList(hint) {
     console.log('');
   }
 
-  console.log(pc.dim('Run fdx call <method> --help for parameter details.'));
+  console.log(pc.dim('Run fdx wallet call <method> --help for parameter details.'));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -270,7 +422,7 @@ function showMethodHelp(method) {
     console.log(pc.dim('  No parameters required.'));
     console.log('');
     console.log(pc.dim('Example:'));
-    console.log(`  fdx call ${method}`);
+    console.log(`  fdx wallet call ${method}`);
     return;
   }
 
@@ -295,7 +447,7 @@ function showMethodHelp(method) {
 
   const example = required.map(([name, p]) => `--${name} ${p.example || '"..."'}`).join(' ');
   console.log(pc.dim('Example:'));
-  console.log(`  fdx call ${method} ${example}`);
+  console.log(`  fdx wallet call ${method} ${example}`);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -311,7 +463,10 @@ function coerceArgs(args, info) {
     const paramInfo = info.params[key];
     if (!paramInfo) continue;
 
-    if ((paramInfo.type === 'number' || paramInfo.type === 'integer') && typeof value === 'string') {
+    if (
+      (paramInfo.type === 'number' || paramInfo.type === 'integer') &&
+      typeof value === 'string'
+    ) {
       const num = Number(value);
       if (!Number.isNaN(num)) {
         coerced[key] = paramInfo.type === 'integer' ? Math.trunc(num) : num;
@@ -326,7 +481,7 @@ function coerceArgs(args, info) {
 /*  Command handler                                                           */
 /* -------------------------------------------------------------------------- */
 
-module.exports = async function call(argv) {
+module.exports = async function walletCall(argv, { serverName = 'wallet' } = {}) {
   const method = argv[0];
 
   // No method given — show categorized list
@@ -365,7 +520,7 @@ module.exports = async function call(argv) {
       console.log(
         pc.yellow(`Warning: unrecognized parameter(s): ${unknown.map((k) => `--${k}`).join(', ')}`),
       );
-      console.log(pc.dim(`  Run fdx call ${method} --help to see accepted parameters.`));
+      console.log(pc.dim(`  Run fdx wallet call ${method} --help to see accepted parameters.`));
       console.log('');
     }
   }
@@ -373,7 +528,7 @@ module.exports = async function call(argv) {
   // Coerce types (string → number/integer) based on schema
   const coercedArgs = coerceArgs(args, info);
 
-  const client = createClientFromEnv();
+  const client = createClientFromEnv(serverName);
   const spinner = createSpinner(`Calling ${pc.cyan(method)}...`).start();
 
   try {
@@ -382,7 +537,7 @@ module.exports = async function call(argv) {
     if (result.error) {
       spinner.error({ text: `${method} failed` });
       console.error(JSON.stringify({ error: result.error }, null, 2));
-      console.error(pc.dim(`  Run fdx call ${method} --help for usage details.`));
+      console.error(pc.dim(`  Run fdx wallet call ${method} --help for usage details.`));
       process.exit(1);
     }
 
@@ -403,7 +558,7 @@ module.exports = async function call(argv) {
         console.error(pc.dim(`  Required: ${req.join(', ')}`));
       }
     }
-    console.error(pc.dim(`  Run fdx call ${method} --help for usage details.`));
+    console.error(pc.dim(`  Run fdx wallet call ${method} --help for usage details.`));
     process.exit(1);
   } finally {
     await client.close().catch(() => {});

@@ -3,10 +3,12 @@ const {
   StreamableHTTPClientTransport,
 } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
 
+const pkg = require('../package.json');
+
 const logger = require('./utils/logger');
 
 const CLIENT_NAME = 'fdx';
-const CLIENT_VERSION = require('../package.json').version;
+const CLIENT_VERSION = pkg.version;
 
 class MCPClient {
   constructor({ mcpServerUrl, authClient }) {
@@ -130,7 +132,10 @@ class MCPClient {
               },
             };
           }
-          logger.error('mcp: token refresh failed during tool call', { tool: toolName, error: refreshError.message });
+          logger.error('mcp: token refresh failed during tool call', {
+            tool: toolName,
+            error: refreshError.message,
+          });
           return {
             error: {
               code: 'AUTH_REFRESH_FAILED',
@@ -152,7 +157,11 @@ class MCPClient {
       }
 
       const statusSuffix = error?.code > 0 ? ` (HTTP ${error.code})` : '';
-      logger.error('mcp: tool call failed', { tool: toolName, code: error?.code, error: error.message });
+      logger.error('mcp: tool call failed', {
+        tool: toolName,
+        code: error?.code,
+        error: error.message,
+      });
       return {
         error: {
           code: 'REQUEST_ERROR',

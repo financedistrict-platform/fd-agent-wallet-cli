@@ -1,7 +1,8 @@
-const createSpinner = require('./spinner');
 const pc = require('picocolors');
 
 const { createClientFromEnv } = require('../../src');
+
+const createSpinner = require('./spinner');
 
 module.exports = async function verify({ code }) {
   if (!code) {
@@ -13,7 +14,9 @@ module.exports = async function verify({ code }) {
 
   const pending = await client.authClient.getPendingVerification();
   if (!pending) {
-    console.error(pc.red('No pending verification found. Run "fdx register" or "fdx login" first.'));
+    console.error(
+      pc.red('No pending verification found. Run "fdx register" or "fdx login" first.'),
+    );
     process.exit(1);
   }
 

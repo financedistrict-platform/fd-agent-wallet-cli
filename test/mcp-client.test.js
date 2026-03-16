@@ -217,7 +217,9 @@ describe('MCPClient', () => {
             err.code = 'SESSION_EXPIRED';
             throw err;
           },
-          refreshToken: async () => { throw new Error('should not be called'); },
+          refreshToken: async () => {
+            throw new Error('should not be called');
+          },
         },
       });
 
@@ -264,7 +266,9 @@ describe('MCPClient', () => {
             err.code = 'SESSION_EXPIRED';
             throw err;
           },
-          refreshToken: async () => { throw new Error('should not be called'); },
+          refreshToken: async () => {
+            throw new Error('should not be called');
+          },
         },
       });
 
@@ -277,8 +281,12 @@ describe('MCPClient', () => {
       const client = new MCPClient({
         mcpServerUrl: 'https://example.com',
         authClient: {
-          getAccessToken: async () => { throw new Error('No access token available'); },
-          refreshToken: async () => { throw new Error('should not be called'); },
+          getAccessToken: async () => {
+            throw new Error('No access token available');
+          },
+          refreshToken: async () => {
+            throw new Error('should not be called');
+          },
         },
       });
 
@@ -291,8 +299,12 @@ describe('MCPClient', () => {
       const client = new MCPClient({
         mcpServerUrl: 'https://example.com',
         authClient: {
-          getAccessToken: async () => { throw new Error('OS credential store is unavailable'); },
-          refreshToken: async () => { throw new Error('should not be called'); },
+          getAccessToken: async () => {
+            throw new Error('OS credential store is unavailable');
+          },
+          refreshToken: async () => {
+            throw new Error('should not be called');
+          },
         },
       });
 
@@ -355,7 +367,10 @@ describe('MCPClient', () => {
 
       const result = await client.callTool('test');
       assert.strictEqual(result.error.code, 'REQUEST_ERROR');
-      assert.ok(result.error.message.includes('HTTP 500'), `expected HTTP 500 in message, got: ${result.error.message}`);
+      assert.ok(
+        result.error.message.includes('HTTP 500'),
+        `expected HTTP 500 in message, got: ${result.error.message}`,
+      );
     });
   });
 
@@ -411,7 +426,9 @@ describe('MCPClient', () => {
             err.code = 'SESSION_EXPIRED';
             throw err;
           },
-          refreshToken: async () => { throw new Error('should not be called'); },
+          refreshToken: async () => {
+            throw new Error('should not be called');
+          },
         },
       });
 
@@ -467,7 +484,6 @@ describe('MCPClient', () => {
         authClient: auth,
       });
 
-      const originalConnect = client.connect.bind(client);
       client.connect = async function () {
         connectCount++;
         const token = await this.authClient.getAccessToken();

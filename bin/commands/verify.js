@@ -61,7 +61,7 @@ module.exports = async function verify({ code }) {
   console.log(
     pc.green('Done.') +
       ' You can now use ' +
-      pc.cyan('"fdx call <method>"') +
+      pc.cyan('"fdx <server> call <method>"') +
       ' to invoke MCP tools.',
   );
 };

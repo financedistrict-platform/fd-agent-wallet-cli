@@ -91,7 +91,7 @@ wallet
 
 const prism = program
   .command('prism')
-  .description('Prism Platform tools (settlements, payments, PoS)');
+  .description('Prism Platform tools (api keys, point of servicess, list of payments)');
 
 prism
   .command('call')

@@ -352,7 +352,11 @@ class MCPAuthClient {
   // Private helpers
   // ---------------------------------------------------------------------------
 
+  // Use Entra authority as credential key so all services share the same token
   #credentialAccount() {
+    if (this.entraAuthority) {
+      return new URL(this.entraAuthority).host;
+    }
     return new URL(this.mcpServerUrl).host;
   }
 

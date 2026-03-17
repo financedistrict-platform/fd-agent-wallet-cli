@@ -1,6 +1,7 @@
 const pc = require('picocolors');
 
 const { createClientFromEnv } = require('../../src');
+const { getServerUrl, getServerNames } = require('../../src/mcp-registry');
 
 const createSpinner = require('./spinner');
 
@@ -15,7 +16,9 @@ module.exports = async function register({ email }) {
   console.log(pc.bold('FDX - Register'));
   console.log('');
   console.log(`${pc.dim('Email:')}       ${email}`);
-  console.log(`${pc.dim('MCP Server:')} ${client.authClient.mcpServerUrl}`);
+  for (const name of getServerNames()) {
+    console.log(`${pc.dim(`${name}:`)}${' '.repeat(Math.max(1, 12 - name.length - 1))}${getServerUrl(name)}`);
+  }
   console.log('');
 
   const spinner = createSpinner('Starting registration...').start();

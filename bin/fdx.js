@@ -19,9 +19,10 @@ program
     [
       '',
       `${pc.dim('Environment (optional overrides):')}`,
-      `  FDX_WALLET_MCP_URL          Wallet MCP server URL (default: https://mcp.fd.xyz)`,
-      `  FDX_PRISM_MCP_URL           Prism MCP server URL (default: https://prism-mcp.fd.xyz)`,
-      `  FDX_MCP_SERVER              Global MCP URL fallback (overrides all if per-server not set)`,
+      `  FDX_ENV                     Entra auth preset: prod|test (default: prod)`,
+      `  FDX_WALLET_MCP_URL          Wallet MCP service URL (default: https://mcp.fd.xyz)`,
+      `  FDX_PRISM_MCP_URL           Prism MCP service URL (default: https://prism-mcp.fd.xyz)`,
+      `  FDX_MCP_SERVER              Global MCP URL fallback (overrides all if per-service not set)`,
       `  FDX_STORE_PATH              Token store path (default: ~/.fdx/auth.json)`,
       `  FDX_LOG_PATH                Log file path (default: ~/.fdx/fdx.log)`,
       `  FDX_LOG_LEVEL               Log verbosity: debug|info|warn|error|off (default: info)`,
@@ -68,7 +69,12 @@ program
     await require('./commands/logout')();
   });
 
-// -- Wallet subcommand group --------------------------------------------------
+program
+  .command('config')
+  .description('Show resolved configuration (env vars, Entra preset, MCP URLs)')
+  .action(() => {
+    require('./commands/config')();
+  });
 
 const wallet = program
   .command('wallet')
@@ -83,11 +89,9 @@ wallet
   .passThroughOptions()
   .action(async (method, _opts, cmd) => {
     await require('./commands/wallet-call')([method, ...cmd.args.slice(1)].filter(Boolean), {
-      serverName: 'wallet',
+      serviceName: 'wallet',
     });
   });
-
-// -- Prism subcommand group ---------------------------------------------------
 
 const prism = program
   .command('prism')
@@ -104,29 +108,25 @@ prism
     await require('./commands/prism-call')([method, ...cmd.args.slice(1)].filter(Boolean));
   });
 
-// -- fdx servers — list registered MCP servers --------------------------------
-
-const { SERVERS } = require('../src/mcp-registry');
+const { SERVICES } = require('../src/mcp-registry');
 
 program
-  .command('servers')
-  .description('List available MCP servers')
+  .command('services')
+  .description('List available services')
   .action(() => {
     console.log('');
-    console.log('Available MCP servers:');
-    for (const [key, srv] of Object.entries(SERVERS)) {
+    console.log('Available MCP services:');
+    for (const [key, srv] of Object.entries(SERVICES)) {
       console.log(`  ${pc.cyan(key.padEnd(10))}${pc.dim('—')} ${srv.name}`);
     }
     console.log('');
-    console.log(`Usage: ${pc.cyan('fdx <server> call <method> [args...]')}`);
+    console.log(`Usage: ${pc.cyan('fdx <service> call <method> [args...]')}`);
     console.log('');
   });
 
-// -- Bare call hint (deprecated) ----------------------------------------------
-
 program
   .command('call')
-  .description('(deprecated — use fdx <server> call ...)')
+  .description('(deprecated — use fdx <service> call ...)')
   .argument('[method]', 'tool name')
   .allowUnknownOption()
   .allowExcessArguments(true)
@@ -135,9 +135,9 @@ program
     console.log('');
     console.log(pc.yellow('"fdx call" is deprecated.'));
     console.log('');
-    console.log(`  Use:  ${pc.cyan('fdx <server> call <method>')}`);
+    console.log(`  Use:  ${pc.cyan('fdx <service> call <method>')}`);
     console.log('');
-    console.log(pc.dim('Run fdx servers to see available servers.'));
+    console.log(pc.dim('Run fdx services to see available services.'));
     process.exit(1);
   });
 

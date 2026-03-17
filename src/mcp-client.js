@@ -156,7 +156,8 @@ class MCPClient {
         };
       }
 
-      const statusSuffix = error?.code > 0 ? ` (HTTP ${error.code})` : '';
+      const statusSuffix =
+        typeof error?.code === 'number' && error.code > 0 ? ` (HTTP ${error.code})` : '';
       logger.error('mcp: tool call failed', {
         tool: toolName,
         code: error?.code,

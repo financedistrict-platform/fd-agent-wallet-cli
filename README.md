@@ -4,7 +4,7 @@
 [![CI](https://github.com/financedistrict-platform/fd-agent-wallet-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/financedistrict-platform/fd-agent-wallet-cli/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A command-line interface to the [Finance District](https://fd.xyz) MCP wallet server. Gives AI agents crypto wallet capabilities — hold, send, swap, and earn yield on assets across multiple chains — without managing private keys.
+A command-line interface to the [Finance District](https://fd.xyz) MCP wallet service. Gives AI agents crypto wallet capabilities — hold, send, swap, and earn yield on assets across multiple chains — without managing private keys.
 
 ## Why FDX?
 
@@ -95,7 +95,7 @@ Removes stored tokens from the OS credential store and clears `~/.fdx/auth.json`
 
 ## Usage
 
-Invoke any MCP tool via the CLI using service subcommands:
+Invoke any MCP tool via the CLI using service commands:
 
 ### Wallet Tools
 
@@ -112,12 +112,12 @@ fdx wallet call getTokenPrice --help               # show params for a tool
 
 ### Prism Platform Tools
 
-Prism tools are discovered dynamically from the server at runtime — new server-side tools appear automatically without CLI updates.
+Prism tools are discovered dynamically from the service at runtime — new tools appear automatically without CLI updates.
 
 ```bash
-fdx prism call                                     # discover all prism tools (fetched live from server)
+fdx prism call                                     # discover all prism tools (fetched live from service)
 fdx prism call listPayments                        # invoke a tool
-fdx prism call listPayments --help                 # show params from server inputSchema
+fdx prism call listPayments --help                 # show params from service inputSchema
 # ... tools are auto-discovered — run fdx prism call to see what's available
 ```
 
@@ -156,8 +156,9 @@ await prism.close();
 
 | Environment Variable | Scope | Default |
 | -------------------- | ----- | ------- |
-| `FDX_WALLET_MCP_URL` | Wallet MCP server URL | `https://mcp.fd.xyz` |
-| `FDX_PRISM_MCP_URL` | Prism MCP server URL | `https://prism-mcp.fd.xyz` |
+| `FDX_ENV` | Entra auth preset (`prod` \| `test`) | `prod` |
+| `FDX_WALLET_MCP_URL` | Wallet MCP service URL | `https://mcp.fd.xyz` |
+| `FDX_PRISM_MCP_URL` | Prism MCP service URL | `https://prism-mcp.fd.xyz` |
 | `FDX_MCP_SERVER` | Global fallback (all services) | — |
 | `FDX_STORE_PATH` | Token store path | `~/.fdx/auth.json` |
 | `FDX_LOG_PATH` | Log file path | `~/.fdx/fdx.log` |
@@ -168,7 +169,7 @@ See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for per-environment setup (st
 ## Documentation
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — System design overview
-- [docs/CONFIGURATION.md](docs/CONFIGURATION.md) — Environment variables and per-server URL setup
+- [docs/CONFIGURATION.md](docs/CONFIGURATION.md) — Environment variables and per-service URL setup
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — Running from source
 - [docs/UNINSTALL.md](docs/UNINSTALL.md) — Removal instructions
 

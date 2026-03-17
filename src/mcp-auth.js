@@ -1,4 +1,4 @@
-﻿const axios = require('axios');
+const axios = require('axios');
 
 const defaultCredentialStore = require('./credential-store');
 const { readStore, writeStore } = require('./storage');
@@ -11,7 +11,7 @@ const logger = require('./utils/logger');
  * Sign-in: /oauth2/v2.0/initiate → /oauth2/v2.0/challenge → /oauth2/v2.0/token
  */
 
-class MCPAuthClient {
+class AuthClient {
   constructor({ mcpServerUrl, storePath, httpClient, credentialStore, entraConfig }) {
     if (!mcpServerUrl) throw new Error('mcpServerUrl is required');
     if (!storePath) throw new Error('storePath is required');
@@ -38,19 +38,12 @@ class MCPAuthClient {
     this.challengeType = 'oob redirect';
   }
 
-  // ---------------------------------------------------------------------------
-  // Entra base URL
-  // ---------------------------------------------------------------------------
   get #entraBaseUrl() {
     if (!this.entraAuthority) {
       throw new Error('Entra authority not configured.');
     }
     return this.entraAuthority.replace(/\/$/, '');
   }
-
-  // ---------------------------------------------------------------------------
-  // Sign-up flow (register new principal)
-  // ---------------------------------------------------------------------------
 
   /**
    * Step 1: Start sign-up — sends OTP to the given email.
@@ -174,10 +167,6 @@ class MCPAuthClient {
     return data;
   }
 
-  // ---------------------------------------------------------------------------
-  // Sign-in flow (existing principal)
-  // ---------------------------------------------------------------------------
-
   /**
    * Step 1: Initiate sign-in — returns continuation token.
    */
@@ -269,10 +258,6 @@ class MCPAuthClient {
     return data;
   }
 
-  // ---------------------------------------------------------------------------
-  // Token management (unchanged interface for MCPClient compatibility)
-  // ---------------------------------------------------------------------------
-
   async getAccessToken() {
     const tokens = await this.#getTokens();
     if (!tokens?.accessToken) {
@@ -347,10 +332,6 @@ class MCPAuthClient {
 
     logger.info('mcp-auth: logged out', { server: this.mcpServerUrl });
   }
-
-  // ---------------------------------------------------------------------------
-  // Private helpers
-  // ---------------------------------------------------------------------------
 
   // Use Entra authority as credential key so all services share the same token
   #credentialAccount() {
@@ -478,4 +459,4 @@ class MCPAuthClient {
   }
 }
 
-module.exports = { MCPAuthClient };
+module.exports = { MCPAuthClient: AuthClient };

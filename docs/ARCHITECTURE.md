@@ -36,7 +36,7 @@ FDX is a three-layer system that gives AI agents secure access to blockchain wal
                                  │ HTTPS + Bearer token
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    Finance District MCP Server                      │
+│                    Finance District MCP Service                     │
 │                      (https://mcp.fd.xyz)                           │
 │                                                                     │
 │  • User authentication via OAuth 2.1                                │
@@ -67,9 +67,9 @@ The npm package includes:
 - **OAuth Client** (`src/mcp-auth.js`): Entra External ID Native Authentication — headless email OTP sign-up and sign-in
 - **MCP Client** (`src/mcp-client.js`): JSON-RPC 2.0 protocol handler with SSE response format
 
-### 2. Finance District MCP Server
+### 2. Finance District MCP Service
 
-The remote server (hosted at fd.xyz) provides:
+The remote service (hosted at fd.xyz) provides:
 
 - **Authentication**: OAuth 2.1 with Microsoft Entra ID (no local keys)
 - **Smart Accounts**: EVM account abstraction via ERC-4337, deterministic Solana addresses
@@ -107,7 +107,7 @@ fdx prism call               # → mcpClient.listTools() → displays all tools
 fdx prism call <tool> --help  # → mcpClient.listTools() → renders inputSchema as help
 ```
 
-Unlike wallet tools (hardcoded `METHOD_INFO` with 15+ tools), prism tools are fetched from the server at runtime. New server-side tools appear automatically without CLI updates — run `fdx prism call` to discover what's available.
+Unlike wallet tools (hardcoded `METHOD_INFO` with 15+ tools), prism tools are fetched from the service at runtime. New tools appear automatically without CLI updates — run `fdx prism call` to discover what's available.
 
 ## Authentication Flow
 
@@ -133,13 +133,13 @@ Unlike wallet tools (hardcoded `METHOD_INFO` with 15+ tools), prism tools are fe
 1. **Load tokens**: Read from `~/.fdx/auth.json`
 2. **Check expiry**: If `access_token` expired, use `refresh_token` to get new token
 3. **Attach header**: `Authorization: Bearer <access_token>`
-4. **Make request**: HTTPS + JSON-RPC to MCP server
+4. **Make request**: HTTPS + JSON-RPC to MCP service
 
 No private keys, no seed phrases. All wallet operations are server-side with user consent via OAuth.
 
 ## Security Model
 
-- **No Local Keys**: Agent never touches private keys. Wallets are managed server-side.
+- **No Local Keys**: Agent never touches private keys. Wallets are managed by the service.
 - **Email OTP**: Passwordless authentication via Entra External ID Native Auth.
 - **Headless Flow**: No browser required — works in containers, CI/CD, remote servers.
 - **Token Refresh**: Long-lived refresh tokens minimize re-authentication.
@@ -162,7 +162,7 @@ FDX abstracts chain differences behind a single API:
 
 ## DeFi Integration
 
-The MCP server integrates with DeFi protocols:
+The MCP service integrates with DeFi protocols:
 
 - **DEX Aggregation**: 1inch, 0x, Jupiter (Solana) for best swap routes
 - **Yield Strategies**: Aave (lending), Compound (lending), Yearn (vaults)

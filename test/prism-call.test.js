@@ -36,18 +36,16 @@ describe('prism-call', () => {
 
   function mockClient({ tools = [], callToolResult = null, connectError = null } = {}) {
     const calls = [];
-    srcModule.createClientFromEnv = (serverName) => {
-      calls.push({ serverName });
+    srcModule.createClientFromEnv = (serviceName) => {
+      calls.push({ serviceName });
       return {
-        mcpClient: {
-          connect: async () => {
-            if (connectError) throw connectError;
-          },
-          listTools: async () => tools,
-          callTool: async (name, args) => {
-            calls.push({ callTool: name, args });
-            return callToolResult || { data: { ok: true } };
-          },
+        connectMcp: async () => {
+          if (connectError) throw connectError;
+        },
+        listTools: async () => tools,
+        callMcpTool: async (name, args) => {
+          calls.push({ callTool: name, args });
+          return callToolResult || { data: { ok: true } };
         },
         close: async () => {},
       };
@@ -64,7 +62,7 @@ describe('prism-call', () => {
     } catch {
       // process.exit throws
     }
-    assert.strictEqual(calls[0].serverName, 'prism');
+    assert.strictEqual(calls[0].serviceName, 'prism');
   });
 
   it('lists tools when no method is given', async () => {

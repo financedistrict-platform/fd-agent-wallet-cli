@@ -1,9 +1,10 @@
 const pc = require('picocolors');
 
 const { createClientFromEnv } = require('../../src');
-const { getServerUrl, getServerNames } = require('../../src/mcp-registry');
+const { getServiceUrl, getServiceNames } = require('../../src/mcp-registry');
 
-const createSpinner = require('./spinner');
+const createSpinner = require('../helpers/spinner');
+const { printError } = require('../helpers/cli-error-handler');
 
 module.exports = async function register({ email }) {
   if (!email) {
@@ -15,9 +16,9 @@ module.exports = async function register({ email }) {
 
   console.log(pc.bold('FDX - Register'));
   console.log('');
-  console.log(`${pc.dim('Email:')}       ${email}`);
-  for (const name of getServerNames()) {
-    console.log(`${pc.dim(`${name}:`)}${' '.repeat(Math.max(1, 12 - name.length - 1))}${getServerUrl(name)}`);
+  console.log(`${pc.dim('Email:')}${' '.repeat(Math.max(1, 12 - 'Email'.length - 1))}${email}`);
+  for (const name of getServiceNames()) {
+    console.log(`${pc.dim(`${name}:`)}${' '.repeat(Math.max(1, 12 - name.length - 1))}${getServiceUrl(name)}`);
   }
   console.log('');
 
@@ -28,14 +29,7 @@ module.exports = async function register({ email }) {
     challenge = await client.register(email);
   } catch (err) {
     spinner.error({ text: 'Registration failed' });
-    if (err.response?.data) {
-      const d = err.response.data;
-      console.error(`\n  ${pc.red('Error:')}   ${d.error || 'unknown'}`);
-      console.error(`  ${pc.red('Detail:')}  ${d.error_description || err.message}`);
-      if (d.suberror) console.error(`  ${pc.red('Sub:')}     ${d.suberror}`);
-    } else {
-      console.error(`\n  ${pc.red('Error:')} ${err.message}`);
-    }
+    printError(err);
     process.exit(1);
   }
 
@@ -49,7 +43,6 @@ module.exports = async function register({ email }) {
   console.log(`Check your email and run: ${pc.cyan('fdx verify --code <OTP_CODE>')}`);
   console.log('');
 
-  // Output machine-readable JSON for agent consumption
   console.log(
     JSON.stringify({
       status: 'otp_sent',

@@ -2,14 +2,34 @@ const os = require('os');
 const path = require('path');
 
 const { FdxClient } = require('./fdx-client');
-const { getServerUrl } = require('./mcp-registry');
+const { getServiceUrl } = require('./mcp-registry');
 
-const DEFAULT_ENTRA_AUTHORITY = 'https://auth.fd.xyz/financedistrict.onmicrosoft.com';
-const DEFAULT_ENTRA_CLIENT_ID = '77109def-1265-40e2-93e0-20051cd9a186';
-const DEFAULT_ENTRA_SCOPES = 'api://fd-agent-wallet-mcp/mcp:tools openid offline_access';
+// Entra presets per environment — switch via FDX_ENV=test|prod (default: prod)
+const ENV_PRESETS = {
+  prod: {
+    authority: 'https://auth.fd.xyz/financedistrict.onmicrosoft.com',
+    clientId: '77109def-1265-40e2-93e0-20051cd9a186',
+    scopes: 'api://fd-agent-wallet-mcp/mcp:tools openid offline_access',
+  },
+  test: {
+    authority: 'https://auth.test.1stdigital.tech/401c099d-173f-468b-af84-a77a4120fb58',
+    clientId: '954aab11-6268-4a2a-b583-6f45804842be',
+    scopes: 'api://fd-agent-wallet-mcp/mcp:tools openid offline_access',
+  },
+};
 
-function createClientFromEnv(serverName = 'wallet') {
-  const mcpServerUrl = getServerUrl(serverName);
+function getEntraConfig() {
+  const env = process.env.FDX_ENV || 'prod';
+  const preset = ENV_PRESETS[env];
+  if (!preset) {
+    const valid = Object.keys(ENV_PRESETS).join(', ');
+    throw new Error(`Unknown FDX_ENV: "${env}". Valid values: ${valid}`);
+  }
+  return preset;
+}
+
+function createClientFromEnv(serviceName = 'wallet') {
+  const mcpServerUrl = getServiceUrl(serviceName);
   const storePath = process.env.FDX_STORE_PATH;
 
   const parsed = new URL(mcpServerUrl);
@@ -24,12 +44,8 @@ function createClientFromEnv(serverName = 'wallet') {
   return new FdxClient({
     mcpServerUrl,
     storePath: storePath || path.join(os.homedir(), '.fdx', 'auth.json'),
-    entraConfig: {
-      authority: DEFAULT_ENTRA_AUTHORITY,
-      clientId: DEFAULT_ENTRA_CLIENT_ID,
-      scopes: DEFAULT_ENTRA_SCOPES,
-    },
+    entraConfig: getEntraConfig(),
   });
 }
 
-module.exports = { createClientFromEnv };
+module.exports = { createClientFromEnv, getEntraConfig, ENV_PRESETS };

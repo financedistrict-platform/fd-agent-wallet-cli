@@ -82,7 +82,7 @@ describe('MCPAuthClient - Credential Store Integration', () => {
 
     await client.completeSignIn('ct-123', 'otp-code', 'user@example.com');
 
-    const secret = JSON.parse(credStore._secrets['mcp.test.example.com']);
+    const secret = JSON.parse(credStore._secrets['testtenant.ciamlogin.com']);
     assert.strictEqual(secret.accessToken, 'access-123');
     assert.strictEqual(secret.refreshToken, 'refresh-456');
 
@@ -131,7 +131,7 @@ describe('MCPAuthClient - Credential Store Integration', () => {
     const credStore = mockCredentialStore(true);
     const { client, storePath } = createClient(tmpDir, credStore);
 
-    credStore._secrets['mcp.test.example.com'] = JSON.stringify({
+    credStore._secrets['testtenant.ciamlogin.com'] = JSON.stringify({
       accessToken: 'keychain-access',
       refreshToken: 'keychain-refresh',
     });
@@ -246,7 +246,7 @@ describe('MCPAuthClient - Credential Store Integration', () => {
       }),
     );
 
-    credStore._secrets['mcp.test.example.com'] = JSON.stringify({
+    credStore._secrets['testtenant.ciamlogin.com'] = JSON.stringify({
       accessToken: 'old-access',
       refreshToken: 'original-refresh',
     });
@@ -265,7 +265,7 @@ describe('MCPAuthClient - Credential Store Integration', () => {
     const newToken = await client.refreshToken();
     assert.strictEqual(newToken, 'new-access');
 
-    const secret = JSON.parse(credStore._secrets['mcp.test.example.com']);
+    const secret = JSON.parse(credStore._secrets['testtenant.ciamlogin.com']);
     assert.strictEqual(secret.accessToken, 'new-access');
     assert.strictEqual(secret.refreshToken, 'original-refresh');
   });
@@ -288,7 +288,7 @@ describe('MCPAuthClient - Credential Store Integration', () => {
       }),
     );
 
-    credStore._secrets['mcp.test.example.com'] = JSON.stringify({
+    credStore._secrets['testtenant.ciamlogin.com'] = JSON.stringify({
       accessToken: 'old-at',
       refreshToken: 'my-refresh-token',
     });
@@ -313,7 +313,7 @@ describe('MCPAuthClient - Credential Store Integration', () => {
       entraConfig: { authority: TEST_AUTHORITY, scopes: 'openid' },
     });
 
-    credStore._secrets['mcp.test.example.com'] = JSON.stringify({
+    credStore._secrets['testtenant.ciamlogin.com'] = JSON.stringify({
       accessToken: 'old-at',
       refreshToken: 'my-refresh-token',
     });
@@ -327,7 +327,7 @@ describe('MCPAuthClient - Credential Store Integration', () => {
       const credStore = mockCredentialStore(true);
       const { client, storePath } = createClient(tmpDir, credStore);
 
-      credStore._secrets['mcp.test.example.com'] = JSON.stringify({
+      credStore._secrets['testtenant.ciamlogin.com'] = JSON.stringify({
         accessToken: 'token',
         refreshToken: 'refresh',
       });
@@ -387,7 +387,7 @@ describe('MCPAuthClient - Credential Store Integration', () => {
       const credStore = mockCredentialStore(true);
       const { client, storePath } = createClient(tmpDir, credStore);
 
-      credStore._secrets['mcp.test.example.com'] = JSON.stringify({
+      credStore._secrets['testtenant.ciamlogin.com'] = JSON.stringify({
         accessToken: 'token',
         refreshToken: 'refresh',
       });
@@ -557,7 +557,7 @@ describe('MCPAuthClient - Sign-up Flow', () => {
     assert.strictEqual(params.get('grant_type'), 'continuation_token');
     assert.strictEqual(params.get('username'), 'agent@example.com');
 
-    const secret = JSON.parse(credStore._secrets['mcp.test.example.com']);
+    const secret = JSON.parse(credStore._secrets['testtenant.ciamlogin.com']);
     assert.strictEqual(secret.accessToken, 'signup-at');
 
     const file = JSON.parse(await fs.readFile(storePath, 'utf8'));
@@ -721,7 +721,7 @@ describe('MCPAuthClient - Sign-in Flow', () => {
     assert.strictEqual(params.get('grant_type'), 'oob');
     assert.strictEqual(params.get('oob'), '87654321');
 
-    const secret = JSON.parse(credStore._secrets['mcp.test.example.com']);
+    const secret = JSON.parse(credStore._secrets['testtenant.ciamlogin.com']);
     assert.strictEqual(secret.accessToken, 'signin-at');
     assert.strictEqual(secret.refreshToken, 'signin-rt');
 
@@ -757,7 +757,7 @@ describe('MCPAuthClient - logout()', () => {
     const { client, storePath } = createClient(tmpDir, credStore);
 
     credStore.setSecret(
-      'mcp.test.example.com',
+      'testtenant.ciamlogin.com',
       JSON.stringify({ accessToken: 'at', refreshToken: 'rt' }),
     );
     await fs.writeFile(
@@ -767,7 +767,7 @@ describe('MCPAuthClient - logout()', () => {
 
     await client.logout();
 
-    assert.strictEqual(credStore.getSecret('mcp.test.example.com'), null);
+    assert.strictEqual(credStore.getSecret('testtenant.ciamlogin.com'), null);
   });
 
   it('should remove tokens from the store file and clear mcpAuth', async () => {

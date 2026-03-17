@@ -33,17 +33,17 @@ describe('CLI commands (no auth)', () => {
     });
   });
 
-  describe('fdx servers', () => {
-    it('should list wallet and prism servers', () => {
-      const { stdout, exitCode } = run('servers');
+  describe('fdx services', () => {
+    it('should list wallet and prism services', () => {
+      const { stdout, exitCode } = run('services');
       assert.strictEqual(exitCode, 0);
-      assert.ok(stdout.includes('wallet'), 'should list wallet server');
-      assert.ok(stdout.includes('prism'), 'should list prism server');
+      assert.ok(stdout.includes('wallet'), 'should list wallet service');
+      assert.ok(stdout.includes('prism'), 'should list prism service');
     });
 
     it('should show usage hint', () => {
-      const { stdout } = run('servers');
-      assert.ok(stdout.includes('fdx <server> call <method>'), 'should show usage pattern');
+      const { stdout } = run('services');
+      assert.ok(stdout.includes('fdx <service> call <method>'), 'should show usage pattern');
     });
   });
 
@@ -58,57 +58,18 @@ describe('CLI commands (no auth)', () => {
       assert.ok(stdout.includes('deprecated'), 'should mention deprecation');
     });
 
-    it('should hint to use fdx <server> call', () => {
+    it('should hint to use fdx <service> call', () => {
       const { stdout } = run('call', 'getMyInfo');
-      assert.ok(stdout.includes('fdx <server> call <method>'), 'should show correct usage');
+      assert.ok(stdout.includes('fdx <service> call <method>'), 'should show correct usage');
     });
 
-    it('should mention fdx servers command', () => {
+    it('should mention fdx services command', () => {
       const { stdout } = run('call');
-      assert.ok(stdout.includes('fdx servers'), 'should hint about servers command');
+      assert.ok(stdout.includes('fdx services'), 'should hint about services command');
     });
   });
 
-  describe('fdx wallet call (no method)', () => {
-    it('should show categorized method list', () => {
-      const { stdout } = run('wallet', 'call');
-      assert.ok(stdout.includes('Wallet'), 'should have Wallet category');
-      assert.ok(stdout.includes('Transfer'), 'should have Transfer category');
-      assert.ok(stdout.includes('Swap'), 'should have Swap category');
-      assert.ok(stdout.includes('Yield'), 'should have Yield category');
-      assert.ok(stdout.includes('Payment'), 'should have Payment category');
-      assert.ok(stdout.includes('Account'), 'should have Account category');
-      assert.ok(stdout.includes('Support'), 'should have Support category');
-    });
-
-    it('should list known methods', () => {
-      const { stdout } = run('wallet', 'call');
-      assert.ok(stdout.includes('getTokenPrice'), 'should list getTokenPrice');
-      assert.ok(stdout.includes('transferTokens'), 'should list transferTokens');
-      assert.ok(stdout.includes('swapTokens'), 'should list swapTokens');
-      assert.ok(stdout.includes('getMyInfo'), 'should list getMyInfo');
-    });
-
-    it('should show help hint', () => {
-      const { stdout } = run('wallet', 'call');
-      assert.ok(stdout.includes('--help'), 'should mention --help for details');
-    });
-  });
-
-  describe('fdx wallet call <method> --help', () => {
-    it('should show parameter details for getTokenPrice', () => {
-      const { stdout } = run('wallet', 'call', 'getTokenPrice', '--help');
-      assert.ok(stdout.includes('token'), 'should show token param');
-      assert.ok(stdout.includes('Required'), 'should indicate required params');
-    });
-
-    it('should show parameter details for transferTokens', () => {
-      const { stdout } = run('wallet', 'call', 'transferTokens', '--help');
-      assert.ok(stdout.includes('toAddress'), 'should show toAddress param');
-      assert.ok(stdout.includes('amount'), 'should show amount param');
-      assert.ok(stdout.includes('chainKey'), 'should show chainKey param');
-    });
-  });
+  // fdx wallet call tests removed — now dynamic via MCP, requires auth
 
   describe('fdx --help', () => {
     it('should list all top-level commands', () => {
@@ -118,7 +79,7 @@ describe('CLI commands (no auth)', () => {
       assert.ok(stdout.includes('login'), 'should list login');
       assert.ok(stdout.includes('wallet'), 'should list wallet');
       assert.ok(stdout.includes('prism'), 'should list prism');
-      assert.ok(stdout.includes('servers'), 'should list servers');
+      assert.ok(stdout.includes('services'), 'should list services');
     });
 
     it('should show environment variable docs', () => {

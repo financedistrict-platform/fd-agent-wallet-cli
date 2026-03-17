@@ -2,7 +2,8 @@ const pc = require('picocolors');
 
 const { createClientFromEnv } = require('../../src');
 
-const createSpinner = require('./spinner');
+const createSpinner = require('../helpers/spinner');
+const { printError } = require('../helpers/cli-error-handler');
 
 module.exports = async function verify({ code }) {
   if (!code) {
@@ -12,7 +13,7 @@ module.exports = async function verify({ code }) {
 
   const client = createClientFromEnv();
 
-  const pending = await client.authClient.getPendingVerification();
+  const pending = await client.getPendingVerification();
   if (!pending) {
     console.error(
       pc.red('No pending verification found. Run "fdx register" or "fdx login" first.'),
@@ -39,14 +40,7 @@ module.exports = async function verify({ code }) {
     }
   } catch (err) {
     spinner.error({ text: 'Verification failed' });
-    if (err.response?.data) {
-      const d = err.response.data;
-      console.error(`\n  ${pc.red('Error:')}   ${d.error || 'unknown'}`);
-      console.error(`  ${pc.red('Detail:')}  ${d.error_description || err.message}`);
-      if (d.suberror) console.error(`  ${pc.red('Sub:')}     ${d.suberror}`);
-    } else {
-      console.error(`\n  ${pc.red('Error:')} ${err.message}`);
-    }
+    printError(err);
     process.exit(1);
   }
 
@@ -61,7 +55,7 @@ module.exports = async function verify({ code }) {
   console.log(
     pc.green('Done.') +
       ' You can now use ' +
-      pc.cyan('"fdx <server> call <method>"') +
+      pc.cyan('"fdx <service> call <method>"') +
       ' to invoke MCP tools.',
   );
 };

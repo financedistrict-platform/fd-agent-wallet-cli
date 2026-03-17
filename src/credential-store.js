@@ -163,9 +163,7 @@ function deleteSecret(account) {
   }
 }
 
-// --- Windows DPAPI helpers ---
-// Tokens are encrypted with the current user's Windows login credentials
-// and stored in a file under ~/.fdx/
+// Tokens are encrypted with the current user's Windows login credentials via DPAPI
 
 function dpapiPath(account) {
   const hash = crypto.createHash('sha256').update(account).digest('hex').slice(0, 16);

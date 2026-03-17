@@ -1,41 +1,41 @@
 const assert = require('node:assert');
 const { afterEach, beforeEach, describe, it } = require('node:test');
 
-const { getServer, getServerUrl, getServerNames, SERVERS } = require('../src/mcp-registry');
+const { getService, getServiceUrl, getServiceNames, SERVICES } = require('../src/mcp-registry');
 
 describe('mcp-registry', () => {
   it('returns wallet MCP config', () => {
-    const mcp = getServer('wallet');
+    const mcp = getService('wallet');
     assert.strictEqual(mcp.url, 'https://mcp.fd.xyz');
     assert.strictEqual(mcp.name, 'Finance District Wallet');
   });
 
   it('returns prism MCP config', () => {
-    const mcp = getServer('prism');
+    const mcp = getService('prism');
     assert.strictEqual(mcp.url, 'https://prism-mcp.fd.xyz');
     assert.strictEqual(mcp.name, 'Prism Platform');
   });
 
   it('throws on unknown MCP service', () => {
-    assert.throws(() => getServer('unknown'), /Unknown MCP service "unknown"/);
+    assert.throws(() => getService('unknown'), /Unknown MCP service "unknown"/);
   });
 
   it('error message lists available services', () => {
-    assert.throws(() => getServer('bad'), /Available: wallet, prism/);
+    assert.throws(() => getService('bad'), /Available: wallet, prism/);
   });
 
-  it('lists all MCP server names', () => {
-    const names = getServerNames();
+  it('lists all MCP service names', () => {
+    const names = getServiceNames();
     assert.deepStrictEqual(names, ['wallet', 'prism']);
   });
 
-  it('SERVERS object has expected keys', () => {
-    assert.ok(SERVERS.wallet);
-    assert.ok(SERVERS.prism);
-    assert.strictEqual(Object.keys(SERVERS).length, 2);
+  it('SERVICES object has expected keys', () => {
+    assert.ok(SERVICES.wallet);
+    assert.ok(SERVICES.prism);
+    assert.strictEqual(Object.keys(SERVICES).length, 2);
   });
 
-  describe('getServerUrl', () => {
+  describe('getServiceUrl', () => {
     const envKeys = ['FDX_WALLET_MCP_URL', 'FDX_PRISM_MCP_URL', 'FDX_MCP_SERVER'];
     const saved = {};
 
@@ -56,27 +56,27 @@ describe('mcp-registry', () => {
     });
 
     it('returns hardcoded default when no env vars set', () => {
-      assert.strictEqual(getServerUrl('wallet'), 'https://mcp.fd.xyz');
-      assert.strictEqual(getServerUrl('prism'), 'https://prism-mcp.fd.xyz');
+      assert.strictEqual(getServiceUrl('wallet'), 'https://mcp.fd.xyz');
+      assert.strictEqual(getServiceUrl('prism'), 'https://prism-mcp.fd.xyz');
     });
 
-    it('FDX_MCP_SERVER overrides all servers', () => {
+    it('FDX_MCP_SERVER overrides all services', () => {
       process.env.FDX_MCP_SERVER = 'https://staging.fd.xyz';
-      assert.strictEqual(getServerUrl('wallet'), 'https://staging.fd.xyz');
-      assert.strictEqual(getServerUrl('prism'), 'https://staging.fd.xyz');
+      assert.strictEqual(getServiceUrl('wallet'), 'https://staging.fd.xyz');
+      assert.strictEqual(getServiceUrl('prism'), 'https://staging.fd.xyz');
     });
 
-    it('per-server env var takes priority over FDX_MCP_SERVER', () => {
+    it('per-service env var takes priority over FDX_MCP_SERVER', () => {
       process.env.FDX_MCP_SERVER = 'https://global.fd.xyz';
       process.env.FDX_WALLET_MCP_URL = 'https://wallet-staging.fd.xyz';
-      assert.strictEqual(getServerUrl('wallet'), 'https://wallet-staging.fd.xyz');
-      assert.strictEqual(getServerUrl('prism'), 'https://global.fd.xyz');
+      assert.strictEqual(getServiceUrl('wallet'), 'https://wallet-staging.fd.xyz');
+      assert.strictEqual(getServiceUrl('prism'), 'https://global.fd.xyz');
     });
 
     it('FDX_PRISM_MCP_URL overrides prism only', () => {
       process.env.FDX_PRISM_MCP_URL = 'https://prism-staging.fd.xyz';
-      assert.strictEqual(getServerUrl('wallet'), 'https://mcp.fd.xyz');
-      assert.strictEqual(getServerUrl('prism'), 'https://prism-staging.fd.xyz');
+      assert.strictEqual(getServiceUrl('wallet'), 'https://mcp.fd.xyz');
+      assert.strictEqual(getServiceUrl('prism'), 'https://prism-staging.fd.xyz');
     });
   });
 });

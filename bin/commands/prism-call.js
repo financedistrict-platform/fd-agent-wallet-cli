@@ -3,19 +3,15 @@ const pc = require('picocolors');
 const { createClientFromEnv } = require('../../src');
 const { parseArgs } = require('../../src/utils/args');
 
-const createSpinner = require('./spinner');
-
-/* -------------------------------------------------------------------------- */
-/*  Show available Prism tools (dynamic via listTools)                        */
-/* -------------------------------------------------------------------------- */
+const createSpinner = require('../helpers/spinner');
 
 async function showToolsList() {
   const client = createClientFromEnv('prism');
   const spinner = createSpinner('Fetching Prism tools...').start();
 
   try {
-    await client.mcpClient.connect();
-    const tools = await client.mcpClient.listTools();
+    await client.connectMcp();
+    const tools = await client.listTools();
     spinner.success({ text: `${tools.length} tools available` });
 
     console.log('');
@@ -40,17 +36,13 @@ async function showToolsList() {
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Show help for a specific Prism tool (renders inputSchema)                 */
-/* -------------------------------------------------------------------------- */
-
 async function showToolHelp(method) {
   const client = createClientFromEnv('prism');
   const spinner = createSpinner(`Fetching ${method} schema...`).start();
 
   try {
-    await client.mcpClient.connect();
-    const tools = await client.mcpClient.listTools();
+    await client.connectMcp();
+    const tools = await client.listTools();
     const tool = tools.find((t) => t.name === method);
 
     if (!tool) {
@@ -105,38 +97,33 @@ async function showToolHelp(method) {
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Command handler                                                           */
-/* -------------------------------------------------------------------------- */
-
 module.exports = async function prismCall(argv) {
   const method = argv[0];
 
-  // No method → list available tools from server
   if (!method) {
     await showToolsList();
     return;
   }
 
-  // --help for a specific method → show inputSchema
   if (argv.slice(1).includes('--help')) {
     await showToolHelp(method);
     return;
   }
 
-  // Invoke tool
   const args = parseArgs(argv.slice(1));
   const client = createClientFromEnv('prism');
   const spinner = createSpinner(`Calling ${pc.cyan(method)}...`).start();
+  let exitCode = 0;
 
   try {
-    await client.mcpClient.connect();
-    const result = await client.mcpClient.callTool(method, args);
+    await client.connectMcp();
+    const result = await client.callMcpTool(method, args);
 
     if (result.error) {
       spinner.error({ text: `${method} failed` });
       console.error(JSON.stringify({ error: result.error }, null, 2));
-      process.exit(1);
+      exitCode = 1;
+      return;
     }
 
     spinner.success({ text: method });
@@ -144,8 +131,9 @@ module.exports = async function prismCall(argv) {
   } catch (error) {
     spinner.error({ text: `${method} failed` });
     console.error(pc.red(error.message));
-    process.exit(1);
+    exitCode = 1;
   } finally {
     await client.close().catch(() => {});
+    if (exitCode) process.exit(exitCode);
   }
 };

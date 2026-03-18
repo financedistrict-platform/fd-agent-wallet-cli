@@ -12,8 +12,8 @@ const ENV_PRESETS = {
     scopes: 'api://fd-agent-wallet-mcp/mcp:tools openid offline_access',
   },
   test: {
-    authority: 'https://auth.test.1stdigital.tech/401c099d-173f-468b-af84-a77a4120fb58',
-    clientId: '954aab11-6268-4a2a-b583-6f45804842be',
+    authority: 'https://auth.test.1stdigital.tech/fdxyzdev.onmicrosoft.com',
+    clientId: '7f4c5ba2-d2da-44dd-81a0-adc4057d2882',
     scopes: 'api://fd-agent-wallet-mcp/mcp:tools openid offline_access',
   },
 };

@@ -11,9 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `fdx wallet call <method>` — Wallet MCP tools (transfers, swaps, yield, X402 payments)
 - `fdx prism call <method>` — Prism Platform tools with dynamic server discovery
-- `fdx servers` — list available MCP servers and their URLs
-- Multi-server routing — CLI routes tool calls to Wallet or Prism based on subcommand
-- `FDX_WALLET_MCP_URL` / `FDX_PRISM_MCP_URL` env vars for per-server URL overrides
+- `fdx services` — list available services and their URLs
+- Multi-service routing — CLI routes tool calls to Wallet or Prism based on subcommand
+- `FDX_WALLET_MCP_URL` / `FDX_PRISM_MCP_URL` env vars for per-service URL overrides
 
 ### Changed
 
@@ -23,11 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated
 
 - `fdx call <method>` — use `fdx wallet call <method>` or `fdx prism call <method>` instead (exits with error)
-- `FDX_MCP_SERVER` env var — use per-server env vars (`FDX_WALLET_MCP_URL`, `FDX_PRISM_MCP_URL`)
+- `FDX_MCP_SERVER` env var — use per-service env vars (`FDX_WALLET_MCP_URL`, `FDX_PRISM_MCP_URL`)
 
 ### Fixed
 
-- Tool routing ambiguity resolved by requiring explicit server selection
+- Tool routing ambiguity resolved by requiring explicit service selection
 
 ### Migration
 
@@ -42,7 +42,7 @@ fdx call getTokenPrice --token ETH
 fdx wallet call getMyInfo
 fdx wallet call getTokenPrice --token ETH
 fdx prism call listPayments          # new: Prism tools
-fdx servers                          # list available servers
+fdx services                         # list available services
 ```
 
 **SDK imports:**

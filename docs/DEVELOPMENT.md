@@ -54,7 +54,7 @@ fdx status                       # auth status
 fdx wallet call getMyInfo        # account info
 fdx wallet call getAppVersion    # server version
 fdx wallet call                  # list all available wallet tools
-fdx prism call                   # discover prism tools (fetched from server)
+fdx prism call                   # discover prism tools (fetched from service)
 ```
 
 All commands should return data. Run `fdx wallet call` or `fdx prism call` without arguments to see the full list of available tools. If auth errors occur, run `fdx login --email you@example.com` and `fdx verify --code <OTP>` again.
@@ -63,7 +63,7 @@ All commands should return data. Run `fdx wallet call` or `fdx prism call` witho
 
 | Variable           | Description        | Default                                |
 | ------------------ | ------------------ | -------------------------------------- |
-| `FDX_MCP_SERVER`   | MCP server URL     | `https://mcp.fd.xyz`                   |
+| `FDX_MCP_SERVER`   | MCP service URL (deprecated) | `https://mcp.fd.xyz`          |
 | `FDX_STORE_PATH`   | Token store path   | `~/.fdx/auth.json`                     |
 | `FDX_LOG_PATH`     | Log file path      | `~/.fdx/fdx.log`                       |
 | `FDX_LOG_LEVEL`    | Log verbosity (`debug`\|`info`\|`warn`\|`error`\|`off`) | `info` |
@@ -74,7 +74,7 @@ You can set these inline before a command, as persistent shell exports, or via a
 
 ## 6. Testing against a non-production environment
 
-The CLI defaults to the production server. To point it at a different environment, override `FDX_MCP_SERVER` — the test server address is shared privately with the test team and must never be committed to the repository.
+The CLI defaults to the production services. To point it at a different environment, override `FDX_WALLET_MCP_URL` / `FDX_PRISM_MCP_URL` (or the deprecated `FDX_MCP_SERVER` fallback) — the test service addresses are shared privately with the test team and must never be committed to the repository.
 
 **Option A — inline (one command):**
 

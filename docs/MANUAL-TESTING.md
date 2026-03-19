@@ -1,14 +1,14 @@
 # Manual Testing Guide — FDX CLI
 
-How to test the CLI against local MCP servers (wallet + prism).
+How to test the CLI against local MCP services (wallet + prism).
 
 ---
 
 ## Prerequisites
 
 - Node.js >= 18
-- MCP Wallet server running locally (default: `http://localhost:5000`)
-- MCP Prism server running locally (default: `http://localhost:5020`)
+- MCP Wallet service running locally (default: `http://localhost:5000`)
+- MCP Prism service running locally (default: `http://localhost:5020`)
 - Email registered with Entra External ID
 
 ---
@@ -31,8 +31,8 @@ FDX_LOG_LEVEL=debug
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `FDX_WALLET_MCP_URL` | Wallet MCP server URL | `https://mcp.fd.xyz` |
-| `FDX_PRISM_MCP_URL` | Prism MCP server URL | `https://prism-mcp.fd.xyz` |
+| `FDX_WALLET_MCP_URL` | Wallet MCP service URL | `https://mcp.fd.xyz` |
+| `FDX_PRISM_MCP_URL` | Prism MCP service URL | `https://prism-mcp.fd.xyz` |
 | `FDX_LOG_LEVEL` | Log verbosity (`debug`\|`info`\|`warn`\|`error`\|`off`) | `info` |
 | `FDX_STORE_PATH` | Token store path | `~/.fdx/auth.json` |
 
@@ -60,10 +60,10 @@ These commands work without logging in:
 # Check auth status
 node bin/fdx.js status
 
-# List configured MCP servers
-node bin/fdx.js servers
+# List configured MCP services
+node bin/fdx.js services
 
-# List wallet tools (from static metadata, no server call)
+# List wallet tools (from static metadata, no service call)
 node bin/fdx.js wallet call
 
 # Show params for a wallet tool
@@ -103,7 +103,7 @@ Expected output:
 
 ```
 Status: authenticated
-  MCP server:    http://localhost:5000
+  MCP service:    http://localhost:5000
   Store path:    C:\Users\<user>\.fdx\auth.json
   Email:         you@example.com
   Token expires: 2026-03-17T...
@@ -135,10 +135,10 @@ node bin/fdx.js wallet call
 
 ## 6. Testing Prism Tools
 
-Prism tools are fetched dynamically from the server (not hardcoded):
+Prism tools are fetched dynamically from the service (not hardcoded):
 
 ```bash
-# List all prism tools (fetched from server)
+# List all prism tools (fetched from service)
 node bin/fdx.js prism call
 
 # Show params for a tool
@@ -165,7 +165,7 @@ Removes tokens from the OS credential store and clears `~/.fdx/auth.json`.
 
 ## Important Notes
 
-- **HTTP only for localhost**: CLI allows HTTP with `localhost`/`127.0.0.1`. Remote servers require HTTPS.
+- **HTTP only for localhost**: CLI allows HTTP with `localhost`/`127.0.0.1`. Remote services require HTTPS.
 - **Automatic token refresh**: When the access token expires, CLI auto-refreshes using the refresh token. If the refresh token also expires, run `fdx login` again.
 - **Shared auth token**: Wallet and Prism share the same Entra auth token. Only one login is needed.
 - **Log file**: Check detailed logs at `~/.fdx/fdx.log` (set `FDX_LOG_LEVEL=debug` for full output).

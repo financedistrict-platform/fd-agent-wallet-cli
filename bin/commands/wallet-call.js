@@ -2,7 +2,6 @@ const pc = require('picocolors');
 
 const { createClientFromEnv } = require('../../src');
 const { parseArgs } = require('../../src/utils/args');
-
 const createSpinner = require('../helpers/spinner');
 const { levenshtein, coerceArgsBySchema } = require('../helpers/wallet-method-registry');
 
@@ -11,12 +10,11 @@ async function showToolsList(serviceName, hint) {
   const spinner = createSpinner('Fetching wallet tools...').start();
 
   try {
-    await client.connectMcp();
     const tools = await client.listTools();
     spinner.success({ text: `${tools.length} tools available` });
 
     console.log('');
-    console.log(`Usage: fdx wallet call ${pc.cyan('<method>')} [--param value ...]`);
+    console.log(`Usage: fdx wallet ${pc.cyan('<method>')} [--param value ...]`);
     console.log('');
 
     for (const tool of tools) {
@@ -30,7 +28,7 @@ async function showToolsList(serviceName, hint) {
       console.log('');
     }
 
-    console.log(pc.dim('Run fdx wallet call <method> --help for parameter details.'));
+    console.log(pc.dim('Run fdx wallet <method> --help for parameter details.'));
   } catch (error) {
     spinner.error({ text: 'Failed to fetch tools' });
     console.error(pc.red(error.message));
@@ -48,7 +46,6 @@ async function showToolHelp(serviceName, method) {
   const spinner = createSpinner(`Fetching ${method} schema...`).start();
 
   try {
-    await client.connectMcp();
     const tools = await client.listTools();
     const tool = tools.find((t) => t.name === method);
 
@@ -94,7 +91,7 @@ async function showToolHelp(serviceName, method) {
 
     const exampleArgs = reqParams.map(([name]) => `--${name} "..."`).join(' ');
     console.log(pc.dim('Example:'));
-    console.log(`  fdx wallet call ${method} ${exampleArgs}`);
+    console.log(`  fdx wallet ${method} ${exampleArgs}`);
   } catch (error) {
     spinner.error({ text: 'Failed to fetch schema' });
     console.error(pc.red(error.message));
@@ -146,8 +143,6 @@ module.exports = async function walletCall(argv, { serviceName = 'wallet' } = {}
   const spinner = createSpinner(`Calling ${pc.cyan(method)}...`).start();
 
   try {
-    await client.connectMcp();
-
     const tools = await client.listTools();
     const tool = tools.find((t) => t.name === method);
 
@@ -157,7 +152,7 @@ module.exports = async function walletCall(argv, { serviceName = 'wallet' } = {}
       if (suggestion) {
         console.log(pc.yellow(`Did you mean ${pc.cyan(suggestion)}?`));
       }
-      console.log(pc.dim('Run fdx wallet call to see all available methods.'));
+      console.log(pc.dim('Run fdx wallet to see all available methods.'));
       process.exit(1);
     }
 
@@ -167,7 +162,7 @@ module.exports = async function walletCall(argv, { serviceName = 'wallet' } = {}
     if (result.error) {
       spinner.error({ text: `${method} failed` });
       console.error(JSON.stringify({ error: result.error }, null, 2));
-      console.error(pc.dim(`  Run fdx wallet call ${method} --help for usage details.`));
+      console.error(pc.dim(`  Run fdx wallet ${method} --help for usage details.`));
       process.exit(1);
     }
 

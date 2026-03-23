@@ -5,11 +5,11 @@ const ENV_KEY_SUFFIX = '_MCP_URL';
 const SERVICES = {
   wallet: {
     url: 'https://mcp.fd.xyz',
-    name: 'Finance District Wallet',
+    name: 'Finance District Agent Wallet',
   },
   prism: {
     url: 'https://prism-mcp.fd.xyz',
-    name: 'Prism Platform',
+    name: 'Finance District Prism Payment Gateway',
   },
 };
 

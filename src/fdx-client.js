@@ -1,3 +1,5 @@
+const path = require('path');
+
 const { MCPAuthClient } = require('./mcp-auth');
 const { MCPClient } = require('./mcp-client');
 
@@ -16,6 +18,7 @@ class FdxClient {
     this.mcpClient = new MCPClient({
       mcpServerUrl,
       authClient: this.authClient,
+      toolsCachePath: path.join(path.dirname(storePath), 'tools-cache.json'),
     });
   }
 

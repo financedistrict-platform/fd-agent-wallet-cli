@@ -3,23 +3,16 @@ const path = require('path');
 
 const pc = require('picocolors');
 
-const { getEntraConfig, ENV_PRESETS } = require('../../src/factory');
+const { getEntraConfig } = require('../../src/factory');
 const { getServiceUrl, SERVICES } = require('../../src/mcp-registry');
 
-// Show resolved config for all env vars, Entra preset, and MCP service URLs
+// Show resolved config for all env vars, Entra settings, and MCP service URLs
 module.exports = function config() {
-  const env = process.env.FDX_ENV || 'prod';
   const storePath = process.env.FDX_STORE_PATH || path.join(os.homedir(), '.fdx', 'auth.json');
   const logPath = process.env.FDX_LOG_PATH || path.join(os.homedir(), '.fdx', 'fdx.log');
   const logLevel = process.env.FDX_LOG_LEVEL || 'info';
 
-  let entra;
-  try {
-    entra = getEntraConfig();
-  } catch (err) {
-    console.log(pc.red(`FDX_ENV error: ${err.message}`));
-    process.exit(1);
-  }
+  const entra = getEntraConfig();
 
   const isOverride = (key) => (process.env[key] ? pc.cyan('(env)') : pc.dim('(default)'));
 
@@ -27,19 +20,11 @@ module.exports = function config() {
   console.log(pc.bold('FDX Configuration'));
   console.log('');
 
-  // Environment preset
-  console.log(pc.underline('Environment'));
-  console.log(`  FDX_ENV            ${pc.green(env)}  ${isOverride('FDX_ENV')}`);
-  console.log('');
-
   // Entra auth
   console.log(pc.underline('Entra Auth'));
-  console.log(`  Authority          ${entra.authority}`);
-  console.log(`  Client ID          ${entra.clientId}`);
-  console.log(`  Scopes             ${entra.scopes}`);
-  if (entra.authority.includes('TODO-')) {
-    console.log(`  ${pc.yellow('⚠ Placeholder values — test Entra tenant not yet configured')}`);
-  }
+  console.log(`  Authority          ${entra.authority}  ${isOverride('FDX_AUTHORITY')}`);
+  console.log(`  Client ID          ${entra.clientId}  ${isOverride('FDX_CLIENT_ID')}`);
+  console.log(`  Scopes             ${entra.scopes}  ${isOverride('FDX_SCOPES')}`);
   console.log('');
 
   // MCP services
@@ -59,13 +44,5 @@ module.exports = function config() {
   console.log(`  Store path         ${storePath}  ${isOverride('FDX_STORE_PATH')}`);
   console.log(`  Log path           ${logPath}  ${isOverride('FDX_LOG_PATH')}`);
   console.log(`  Log level          ${logLevel}  ${isOverride('FDX_LOG_LEVEL')}`);
-  console.log('');
-
-  // Available presets
-  console.log(pc.underline('Available Presets'));
-  for (const key of Object.keys(ENV_PRESETS)) {
-    const marker = key === env ? pc.green('● ') : pc.dim('○ ');
-    console.log(`  ${marker}${key}`);
-  }
   console.log('');
 };

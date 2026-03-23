@@ -43,7 +43,7 @@ describe('CLI commands (no auth)', () => {
 
     it('should show usage hint', () => {
       const { stdout } = run('services');
-      assert.ok(stdout.includes('fdx <service> call <method>'), 'should show usage pattern');
+      assert.ok(stdout.includes('fdx <service> <method>'), 'should show usage pattern');
     });
   });
 
@@ -58,9 +58,9 @@ describe('CLI commands (no auth)', () => {
       assert.ok(stdout.includes('deprecated'), 'should mention deprecation');
     });
 
-    it('should hint to use fdx <service> call', () => {
+    it('should hint to use fdx <service> <method>', () => {
       const { stdout } = run('call', 'getMyInfo');
-      assert.ok(stdout.includes('fdx <service> call <method>'), 'should show correct usage');
+      assert.ok(stdout.includes('fdx <service> <method>'), 'should show correct usage');
     });
 
     it('should mention fdx services command', () => {

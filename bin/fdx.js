@@ -19,7 +19,9 @@ program
     [
       '',
       `${pc.dim('Environment (optional overrides):')}`,
-      `  FDX_ENV                     Entra auth preset: prod|test (default: prod)`,
+      `  FDX_AUTHORITY               Entra authority URL`,
+      `  FDX_CLIENT_ID               Entra client (application) ID`,
+      `  FDX_SCOPES                  Entra scopes`,
       `  FDX_WALLET_MCP_URL          Wallet MCP service URL (default: https://mcp.fd.xyz)`,
       `  FDX_PRISM_MCP_URL           Prism MCP service URL (default: https://prism-mcp.fd.xyz)`,
       `  FDX_MCP_SERVER              Global MCP URL fallback (overrides all if per-service not set)`,
@@ -76,36 +78,38 @@ program
     require('./commands/config')();
   });
 
-const wallet = program
+program
   .command('wallet')
-  .description('Wallet MCP tools (DeFi, transfers, X402 payments)');
-
-wallet
-  .command('call')
-  .description('Invoke a Wallet MCP tool')
+  .description('Wallet MCP tools (DeFi, transfers, X402 payments)')
   .argument('[method]', 'tool name to invoke')
   .allowUnknownOption()
   .allowExcessArguments(true)
   .passThroughOptions()
   .action(async (method, _opts, cmd) => {
-    await require('./commands/wallet-call')([method, ...cmd.args.slice(1)].filter(Boolean), {
+    // Skip legacy "call" keyword — treat next arg as the method
+    const rawArgs = cmd.args.slice(1);
+    if (method === 'call') {
+      method = rawArgs.shift();
+    }
+    await require('./commands/wallet-call')([method, ...rawArgs].filter(Boolean), {
       serviceName: 'wallet',
     });
   });
 
-const prism = program
+program
   .command('prism')
-  .description('Prism Platform tools (api keys, point of servicess, list of payments)');
-
-prism
-  .command('call')
-  .description('Invoke a Prism MCP tool')
+  .description('Prism MCP tools (payments, settlements, accounts)')
   .argument('[method]', 'tool name to invoke')
   .allowUnknownOption()
   .allowExcessArguments(true)
   .passThroughOptions()
   .action(async (method, _opts, cmd) => {
-    await require('./commands/prism-call')([method, ...cmd.args.slice(1)].filter(Boolean));
+    // Skip legacy "call" keyword — treat next arg as the method
+    const rawArgs = cmd.args.slice(1);
+    if (method === 'call') {
+      method = rawArgs.shift();
+    }
+    await require('./commands/prism-call')([method, ...rawArgs].filter(Boolean));
   });
 
 const { SERVICES } = require('../src/mcp-registry');
@@ -120,13 +124,13 @@ program
       console.log(`  ${pc.cyan(key.padEnd(10))}${pc.dim('—')} ${srv.name}`);
     }
     console.log('');
-    console.log(`Usage: ${pc.cyan('fdx <service> call <method> [args...]')}`);
+    console.log(`Usage: ${pc.cyan('fdx <service> <method> [args...]')}`);
     console.log('');
   });
 
 program
   .command('call')
-  .description('(deprecated — use fdx <service> call ...)')
+  .description('(deprecated — use fdx <service> <method> ...)')
   .argument('[method]', 'tool name')
   .allowUnknownOption()
   .allowExcessArguments(true)
@@ -135,7 +139,7 @@ program
     console.log('');
     console.log(pc.yellow('"fdx call" is deprecated.'));
     console.log('');
-    console.log(`  Use:  ${pc.cyan('fdx <service> call <method>')}`);
+    console.log(`  Use:  ${pc.cyan('fdx <service> <method>')}`);
     console.log('');
     console.log(pc.dim('Run fdx services to see available services.'));
     process.exit(1);

@@ -6,12 +6,15 @@ const {
 const pkg = require('../package.json');
 
 const logger = require('./utils/logger');
+const { readStore, writeStore } = require('./storage');
 
 const CLIENT_NAME = 'fdx';
 const CLIENT_VERSION = pkg.version;
 
+const TOOLS_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
 class MCPClient {
-  constructor({ mcpServerUrl, authClient }) {
+  constructor({ mcpServerUrl, authClient, toolsCachePath }) {
     if (!mcpServerUrl) throw new Error('mcpServerUrl is required');
     if (!authClient) throw new Error('authClient is required');
 
@@ -20,6 +23,7 @@ class MCPClient {
     this._client = null;
     this._transport = null;
     this._currentAccessToken = null;
+    this._toolsCachePath = toolsCachePath || null;
   }
 
   async connect() {
@@ -173,6 +177,15 @@ class MCPClient {
   }
 
   async listTools(retried = false) {
+    const cached = await this.#readToolsCache();
+    if (cached) {
+      logger.debug('mcp: using cached tools list', {
+        server: this.mcpServerUrl,
+        count: cached.length,
+      });
+      return cached;
+    }
+
     try {
       if (!this._client) {
         await this.connect();
@@ -180,6 +193,7 @@ class MCPClient {
         await this.#ensureFreshConnection();
       }
       const result = await this._client.listTools();
+      await this.#writeToolsCache(result.tools);
       return result.tools;
     } catch (error) {
       if (isSessionExpired(error)) throw error;
@@ -189,6 +203,31 @@ class MCPClient {
         return this.listTools(true);
       }
       throw error;
+    }
+  }
+
+  async #readToolsCache() {
+    if (!this._toolsCachePath) return null;
+    try {
+      const cache = await readStore(this._toolsCachePath);
+      const entry = cache[this.mcpServerUrl];
+      if (entry && Date.now() - entry.cachedAt < TOOLS_CACHE_TTL) {
+        return entry.tools;
+      }
+    } catch {
+      // Cache miss or corrupted — fall through to server fetch
+    }
+    return null;
+  }
+
+  async #writeToolsCache(tools) {
+    if (!this._toolsCachePath) return;
+    try {
+      const cache = await readStore(this._toolsCachePath).catch(() => ({}));
+      cache[this.mcpServerUrl] = { tools, cachedAt: Date.now() };
+      await writeStore(cache, this._toolsCachePath);
+    } catch (err) {
+      logger.debug('mcp: failed to write tools cache', { error: err.message });
     }
   }
 

@@ -21,8 +21,8 @@ FDX is a three-layer system that gives AI agents secure access to blockchain wal
 │  │                                     │                           │
 │  │  • fdx register, login, verify      │                           │
 │  │  • fdx status                       │                           │
-│  │  • fdx wallet call <method>         │                           │
-│  │  • fdx prism call <method>          │                           │
+│  │  • fdx wallet <method>            │                           │
+│  │  • fdx prism <method>             │                           │
 │  └─────────────────────────────────────┘                           │
 │                                                                     │
 │  ┌──────────────────────────────────────────────────────────────┐  │
@@ -82,7 +82,7 @@ The remote service (hosted at fd.xyz) provides:
 ### Example: Agent Checks Wallet Balance
 
 1. **User asks agent**: _"What's my ETH balance?"_
-2. **Agent invokes CLI**: `fdx wallet call getWalletOverview --chainKey ethereum`
+2. **Agent invokes CLI**: `fdx wallet getWalletOverview --chainKey ethereum`
 3. **CLI loads SDK**: `bin/commands/wallet-call.js` → `src/fdx-client.js` → `getWalletOverview()`
 4. **SDK authenticates**: Reads OAuth tokens from `~/.fdx/auth.json`
 5. **SDK calls MCP**: HTTPS request to `mcp.fd.xyz` with JSON-RPC 2.0 payload
@@ -93,7 +93,7 @@ The remote service (hosted at fd.xyz) provides:
 ### Example: Agent Lists Prism Payments
 
 1. **User asks agent**: _"Show me recent payments"_
-2. **Agent invokes CLI**: `fdx prism call listPayments`
+2. **Agent invokes CLI**: `fdx prism listPayments`
 3. **CLI loads handler**: `bin/commands/prism-call.js` → `createClientFromEnv('prism')`
 4. **SDK authenticates**: Same Entra OAuth tokens (shared auth)
 5. **SDK calls MCP**: HTTPS request to `prism-mcp.fd.xyz` via `mcpClient.callTool()`
@@ -103,11 +103,11 @@ The remote service (hosted at fd.xyz) provides:
 ### Example: Dynamic Tool Discovery
 
 ```bash
-fdx prism call               # → mcpClient.listTools() → displays all tools
-fdx prism call <tool> --help  # → mcpClient.listTools() → renders inputSchema as help
+fdx prism                     # → mcpClient.listTools() → displays all tools
+fdx prism <tool> --help       # → mcpClient.listTools() → renders inputSchema as help
 ```
 
-Unlike wallet tools (hardcoded `METHOD_INFO` with 15+ tools), prism tools are fetched from the service at runtime. New tools appear automatically without CLI updates — run `fdx prism call` to discover what's available.
+Unlike wallet tools (hardcoded `METHOD_INFO` with 15+ tools), prism tools are fetched from the service at runtime. New tools appear automatically without CLI updates — run `fdx prism` to discover what's available.
 
 ## Authentication Flow
 
@@ -168,7 +168,7 @@ The MCP service integrates with DeFi protocols:
 - **Yield Strategies**: Aave (lending), Compound (lending), Yearn (vaults)
 - **Smart Routing**: Policy-driven swap execution (BestExecution, LowGas, MevProtected)
 
-Agents can discover strategies, deposit tokens, and withdraw yield — run `fdx wallet call` to see all available tools, or `fdx wallet call <tool> --help` for parameter details.
+Agents can discover strategies, deposit tokens, and withdraw yield — run `fdx wallet` to see all available tools, or `fdx wallet <tool> --help` for parameter details.
 
 ## Development & Testing
 

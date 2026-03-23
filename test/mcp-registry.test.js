@@ -7,13 +7,13 @@ describe('mcp-registry', () => {
   it('returns wallet MCP config', () => {
     const mcp = getService('wallet');
     assert.strictEqual(mcp.url, 'https://mcp.fd.xyz');
-    assert.strictEqual(mcp.name, 'Finance District Wallet');
+    assert.strictEqual(mcp.name, 'Finance District Agent Wallet');
   });
 
   it('returns prism MCP config', () => {
     const mcp = getService('prism');
     assert.strictEqual(mcp.url, 'https://prism-mcp.fd.xyz');
-    assert.strictEqual(mcp.name, 'Prism Platform');
+    assert.strictEqual(mcp.name, 'Finance District Prism Payment Gateway');
   });
 
   it('throws on unknown MCP service', () => {

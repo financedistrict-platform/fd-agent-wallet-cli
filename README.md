@@ -8,7 +8,7 @@ A command-line interface to the [Finance District](https://fd.xyz) MCP wallet se
 
 ## Why FDX?
 
-FDX is designed for AI agents and agent frameworks that need wallet and platform tooling but don't natively support the [Model Context Protocol (MCP)](https://modelcontextprotocol.io). Instead of integrating an MCP client, agents invoke `fdx wallet call <method>` or `fdx prism call <method>` from the command line and parse JSON output.
+FDX is designed for AI agents and agent frameworks that need wallet and platform tooling but don't natively support the [Model Context Protocol (MCP)](https://modelcontextprotocol.io). Instead of integrating an MCP client, agents invoke `fdx wallet <method>` or `fdx prism <method>` from the command line and parse JSON output.
 
 - **No Key Management** — Email OTP authentication. No seed phrases. No private key files.
 - **Agent-Native** — Structured JSON input/output designed for tool-calling agents.
@@ -100,14 +100,14 @@ Invoke any MCP tool via the CLI using service commands:
 ### Wallet Tools
 
 ```bash
-fdx wallet call                                    # list all available wallet tools
-fdx wallet call getMyInfo                          # account info
-fdx wallet call getWalletOverview --chainKey ethereum  # balances
-fdx wallet call getTokenPrice --token ETH          # price check
-fdx wallet call transferTokens --toAddress 0xABC... --amount 10 --asset USDC --chainKey ethereum
-fdx wallet call discoverYieldStrategies --chainKey base
-fdx wallet call getTokenPrice --help               # show params for a tool
-# ... 15+ tools available — run fdx wallet call to see the full list
+fdx wallet                                         # list all available wallet tools
+fdx wallet getMyInfo                               # account info
+fdx wallet getWalletOverview --chainKey ethereum   # balances
+fdx wallet getTokenPrice --token ETH               # price check
+fdx wallet transferTokens --toAddress 0xABC... --amount 10 --asset USDC --chainKey ethereum
+fdx wallet discoverYieldStrategies --chainKey base
+fdx wallet getTokenPrice --help                    # show params for a tool
+# ... 15+ tools available — run fdx wallet to see the full list
 ```
 
 ### Prism Platform Tools
@@ -115,10 +115,10 @@ fdx wallet call getTokenPrice --help               # show params for a tool
 Prism tools are discovered dynamically from the service at runtime — new tools appear automatically without CLI updates.
 
 ```bash
-fdx prism call                                     # discover all prism tools (fetched live from service)
-fdx prism call listPayments                        # invoke a tool
-fdx prism call listPayments --help                 # show params from service inputSchema
-# ... tools are auto-discovered — run fdx prism call to see what's available
+fdx prism                                          # discover all prism tools (fetched live from service)
+fdx prism listPayments                             # invoke a tool
+fdx prism listPayments --help                      # show params from service inputSchema
+# ... tools are auto-discovered — run fdx prism to see what's available
 ```
 
 ### JSON Output
@@ -126,8 +126,8 @@ fdx prism call listPayments --help                 # show params from service in
 All output is JSON, making it easy for agents to parse:
 
 ```bash
-fdx wallet call getMyInfo | jq '.email'
-fdx prism call listPayments | jq '.[0].status'
+fdx wallet getMyInfo | jq '.email'
+fdx prism listPayments | jq '.[0].status'
 ```
 
 ## SDK Usage
@@ -156,7 +156,9 @@ await prism.close();
 
 | Environment Variable | Scope | Default |
 | -------------------- | ----- | ------- |
-| `FDX_ENV` | Entra auth preset (`prod` \| `test`) | `prod` |
+| `FDX_AUTHORITY` | Entra authority URL | production default |
+| `FDX_CLIENT_ID` | Entra client (application) ID | production default |
+| `FDX_SCOPES` | Entra scopes | production default |
 | `FDX_WALLET_MCP_URL` | Wallet MCP service URL | `https://mcp.fd.xyz` |
 | `FDX_PRISM_MCP_URL` | Prism MCP service URL | `https://prism-mcp.fd.xyz` |
 | `FDX_MCP_SERVER` | Global fallback (all services) | — |

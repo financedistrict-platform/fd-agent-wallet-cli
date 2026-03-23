@@ -1,4 +1,7 @@
 const assert = require('node:assert');
+const fs = require('node:fs/promises');
+const os = require('node:os');
+const path = require('node:path');
 const { describe, it } = require('node:test');
 
 const { MCPClient } = require('../src/mcp-client');
@@ -587,6 +590,172 @@ describe('MCPClient', () => {
       const result = await client.callTool('test');
       assert.strictEqual(callCount, 2);
       assert.deepStrictEqual(result, { data: 'ok' });
+    });
+  });
+
+  describe('tools cache', () => {
+    async function tmpCachePath() {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'fdx-cache-'));
+      return path.join(dir, 'tools-cache.json');
+    }
+
+    it('should write and read tools from file cache', async () => {
+      const cachePath = await tmpCachePath();
+      let connectCount = 0;
+
+      const client = new MCPClient({
+        mcpServerUrl: 'https://example.com',
+        authClient: mockAuthClient(),
+        toolsCachePath: cachePath,
+      });
+
+      client.connect = async function () {
+        connectCount++;
+        const token = await this.authClient.getAccessToken();
+        this._currentAccessToken = token;
+        this._client = {
+          listTools: async () => ({ tools: [{ name: 'cachedTool' }] }),
+          callTool: async () => ({ content: [] }),
+        };
+        this._transport = { close: async () => {} };
+      };
+
+      // First call — cache miss, fetches from server
+      const tools1 = await client.listTools();
+      assert.deepStrictEqual(tools1, [{ name: 'cachedTool' }]);
+      assert.strictEqual(connectCount, 1);
+
+      // Create a new client instance (simulates new process)
+      const client2 = new MCPClient({
+        mcpServerUrl: 'https://example.com',
+        authClient: mockAuthClient(),
+        toolsCachePath: cachePath,
+      });
+
+      let client2Connected = false;
+      client2.connect = async function () {
+        client2Connected = true;
+        this._client = {
+          listTools: async () => ({ tools: [{ name: 'freshTool' }] }),
+          callTool: async () => ({ content: [] }),
+        };
+        this._transport = { close: async () => {} };
+      };
+
+      // Second client — should use file cache, no connect
+      const tools2 = await client2.listTools();
+      assert.deepStrictEqual(tools2, [{ name: 'cachedTool' }]);
+      assert.strictEqual(client2Connected, false);
+
+      await fs.rm(path.dirname(cachePath), { recursive: true });
+    });
+
+    it('should fetch from server when cache is expired', async () => {
+      const cachePath = await tmpCachePath();
+
+      // Write an expired cache entry
+      const expired = {
+        'https://example.com': {
+          tools: [{ name: 'oldTool' }],
+          cachedAt: Date.now() - 2 * 60 * 60 * 1000, // 2 hours ago
+        },
+      };
+      await fs.mkdir(path.dirname(cachePath), { recursive: true });
+      await fs.writeFile(cachePath, JSON.stringify(expired));
+
+      const client = new MCPClient({
+        mcpServerUrl: 'https://example.com',
+        authClient: mockAuthClient(),
+        toolsCachePath: cachePath,
+      });
+      injectMockSDKClient(client);
+
+      const tools = await client.listTools();
+      assert.deepStrictEqual(tools, [{ name: 'testTool' }]);
+
+      await fs.rm(path.dirname(cachePath), { recursive: true });
+    });
+
+    it('should cache per server URL', async () => {
+      const cachePath = await tmpCachePath();
+
+      const client1 = new MCPClient({
+        mcpServerUrl: 'https://wallet.example.com',
+        authClient: mockAuthClient(),
+        toolsCachePath: cachePath,
+      });
+      client1.connect = async function () {
+        this._currentAccessToken = 'tok';
+        this._client = {
+          listTools: async () => ({ tools: [{ name: 'walletTool' }] }),
+          callTool: async () => ({ content: [] }),
+        };
+        this._transport = { close: async () => {} };
+      };
+
+      const client2 = new MCPClient({
+        mcpServerUrl: 'https://prism.example.com',
+        authClient: mockAuthClient(),
+        toolsCachePath: cachePath,
+      });
+      client2.connect = async function () {
+        this._currentAccessToken = 'tok';
+        this._client = {
+          listTools: async () => ({ tools: [{ name: 'prismTool' }] }),
+          callTool: async () => ({ content: [] }),
+        };
+        this._transport = { close: async () => {} };
+      };
+
+      await client1.listTools();
+      await client2.listTools();
+
+      // New clients reading from cache
+      const reader1 = new MCPClient({
+        mcpServerUrl: 'https://wallet.example.com',
+        authClient: mockAuthClient(),
+        toolsCachePath: cachePath,
+      });
+      const reader2 = new MCPClient({
+        mcpServerUrl: 'https://prism.example.com',
+        authClient: mockAuthClient(),
+        toolsCachePath: cachePath,
+      });
+
+      assert.deepStrictEqual(await reader1.listTools(), [{ name: 'walletTool' }]);
+      assert.deepStrictEqual(await reader2.listTools(), [{ name: 'prismTool' }]);
+
+      await fs.rm(path.dirname(cachePath), { recursive: true });
+    });
+
+    it('should skip cache when no toolsCachePath is provided', async () => {
+      const client = new MCPClient({
+        mcpServerUrl: 'https://example.com',
+        authClient: mockAuthClient(),
+      });
+      injectMockSDKClient(client);
+
+      // Should fetch from server (no caching)
+      const tools = await client.listTools();
+      assert.deepStrictEqual(tools, [{ name: 'testTool' }]);
+    });
+
+    it('should gracefully handle corrupted cache file', async () => {
+      const cachePath = await tmpCachePath();
+      await fs.mkdir(path.dirname(cachePath), { recursive: true });
+      await fs.writeFile(cachePath, 'not valid json!!!');
+
+      const client = new MCPClient({
+        mcpServerUrl: 'https://example.com',
+        authClient: mockAuthClient(),
+        toolsCachePath: cachePath,
+      });
+      injectMockSDKClient(client);
+
+      const tools = await client.listTools();
+      assert.deepStrictEqual(tools, [{ name: 'testTool' }]);
+
+      await fs.rm(path.dirname(cachePath), { recursive: true });
     });
   });
 });

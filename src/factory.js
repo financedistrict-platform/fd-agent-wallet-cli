@@ -4,28 +4,19 @@ const path = require('path');
 const { FdxClient } = require('./fdx-client');
 const { getServiceUrl } = require('./mcp-registry');
 
-// Entra presets per environment — switch via FDX_ENV=test|prod (default: prod)
-const ENV_PRESETS = {
-  prod: {
-    authority: 'https://auth.fd.xyz/financedistrict.onmicrosoft.com',
-    clientId: '77109def-1265-40e2-93e0-20051cd9a186',
-    scopes: 'api://fd-agent-wallet-mcp/mcp:tools openid offline_access',
-  },
-  test: {
-    authority: 'https://auth.test.1stdigital.tech/fdxyzdev.onmicrosoft.com',
-    clientId: '7f4c5ba2-d2da-44dd-81a0-adc4057d2882',
-    scopes: 'api://fd-agent-wallet-mcp/mcp:tools openid offline_access',
-  },
+// Production defaults — override any value via FDX_AUTHORITY, FDX_CLIENT_ID, FDX_SCOPES
+const ENTRA_DEFAULTS = {
+  authority: 'https://auth.fd.xyz/financedistrict.onmicrosoft.com',
+  clientId: '77109def-1265-40e2-93e0-20051cd9a186',
+  scopes: 'api://fd-agent-wallet-mcp/mcp:tools openid offline_access',
 };
 
 function getEntraConfig() {
-  const env = process.env.FDX_ENV || 'prod';
-  const preset = ENV_PRESETS[env];
-  if (!preset) {
-    const valid = Object.keys(ENV_PRESETS).join(', ');
-    throw new Error(`Unknown FDX_ENV: "${env}". Valid values: ${valid}`);
-  }
-  return preset;
+  return {
+    authority: process.env.FDX_AUTHORITY || ENTRA_DEFAULTS.authority,
+    clientId: process.env.FDX_CLIENT_ID || ENTRA_DEFAULTS.clientId,
+    scopes: process.env.FDX_SCOPES || ENTRA_DEFAULTS.scopes,
+  };
 }
 
 function createClientFromEnv(serviceName = 'wallet') {
@@ -48,4 +39,4 @@ function createClientFromEnv(serviceName = 'wallet') {
   });
 }
 
-module.exports = { createClientFromEnv, getEntraConfig, ENV_PRESETS };
+module.exports = { createClientFromEnv, getEntraConfig, ENTRA_DEFAULTS };

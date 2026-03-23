@@ -10,12 +10,11 @@ async function showToolsList() {
   const spinner = createSpinner('Fetching Prism tools...').start();
 
   try {
-    await client.connectMcp();
     const tools = await client.listTools();
     spinner.success({ text: `${tools.length} tools available` });
 
     console.log('');
-    console.log(`Usage: fdx prism call ${pc.cyan('<method>')} [--param value ...]`);
+    console.log(`Usage: fdx prism ${pc.cyan('<method>')} [--param value ...]`);
     console.log('');
 
     for (const tool of tools) {
@@ -23,7 +22,7 @@ async function showToolsList() {
     }
 
     console.log('');
-    console.log(pc.dim('Run fdx prism call <method> --help for parameter details.'));
+    console.log(pc.dim('Run fdx prism <method> --help for parameter details.'));
   } catch (error) {
     spinner.error({ text: 'Failed to fetch tools' });
     console.error(pc.red(error.message));
@@ -41,7 +40,6 @@ async function showToolHelp(method) {
   const spinner = createSpinner(`Fetching ${method} schema...`).start();
 
   try {
-    await client.connectMcp();
     const tools = await client.listTools();
     const tool = tools.find((t) => t.name === method);
 
@@ -87,7 +85,7 @@ async function showToolHelp(method) {
 
     const exampleArgs = reqParams.map(([name]) => `--${name} "..."`).join(' ');
     console.log(pc.dim('Example:'));
-    console.log(`  fdx prism call ${method} ${exampleArgs}`);
+    console.log(`  fdx prism ${method} ${exampleArgs}`);
   } catch (error) {
     spinner.error({ text: 'Failed to fetch schema' });
     console.error(pc.red(error.message));
@@ -116,7 +114,6 @@ module.exports = async function prismCall(argv) {
   let exitCode = 0;
 
   try {
-    await client.connectMcp();
     const result = await client.callMcpTool(method, args);
 
     if (result.error) {

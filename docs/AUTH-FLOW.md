@@ -209,7 +209,7 @@ sequenceDiagram
     participant ENTRA as Entra API
     participant SRV as MCP Server<br/>(mcp.fd.xyz)
 
-    U->>CLI: fdx wallet call getTokenPrice --token ETH
+    U->>CLI: fdx wallet getTokenPrice --token ETH
     CLI->>FDX: createClientFromEnv("wallet")
     CLI->>FDX: client.getTokenPrice({ token: "ETH" })
     FDX->>MCP: callTool("getTokenPrice", { token: "ETH" })

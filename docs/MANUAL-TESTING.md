@@ -60,16 +60,14 @@ These commands work without logging in:
 # Check auth status
 node bin/fdx.js status
 
+# Show resolved configuration
+node bin/fdx.js config
+
 # List configured MCP services
 node bin/fdx.js services
-
-# List wallet tools (from static metadata, no service call)
-node bin/fdx.js wallet call
-
-# Show params for a wallet tool
-node bin/fdx.js wallet call getMyInfo --help
-node bin/fdx.js wallet call getTokenPrice --help
 ```
+
+> **Note:** `fdx wallet` and `fdx prism` (with or without `--help`) require authentication — they connect to the MCP server to discover tools dynamically.
 
 ---
 
@@ -118,37 +116,41 @@ Status: authenticated
 After authenticating:
 
 ```bash
+# List all available wallet tools (fetched from service)
+node bin/fdx.js wallet
+
+# Show params for a tool
+node bin/fdx.js wallet getMyInfo --help
+node bin/fdx.js wallet getTokenPrice --help
+
 # Account info
-node bin/fdx.js wallet call getMyInfo
+node bin/fdx.js wallet getMyInfo
 
 # Wallet overview
-node bin/fdx.js wallet call getWalletOverview --chainKey ethereum
+node bin/fdx.js wallet getWalletOverview --chainKey ethereum
 
 # Token price
-node bin/fdx.js wallet call getTokenPrice --token ETH
-
-# List all available tools
-node bin/fdx.js wallet call
+node bin/fdx.js wallet getTokenPrice --token ETH
 ```
 
 ---
 
 ## 6. Testing Prism Tools
 
-Prism tools are fetched dynamically from the service (not hardcoded):
+Prism tools are fetched dynamically from the MCP server (same as wallet):
 
 ```bash
 # List all prism tools (fetched from service)
-node bin/fdx.js prism call
+node bin/fdx.js prism
 
 # Show params for a tool
-node bin/fdx.js prism call getProviderInfo --help
+node bin/fdx.js prism getProviderInfo --help
 
 # Invoke a tool
-node bin/fdx.js prism call getProviderInfo
+node bin/fdx.js prism getProviderInfo
 
 # Invoke with params
-node bin/fdx.js prism call getProviderInfo --includeChains false
+node bin/fdx.js prism getProviderInfo --includeChains false
 ```
 
 ---

@@ -103,12 +103,15 @@ function setSecret(account, secret) {
         } catch {
           // Entry may not exist — ignore
         }
-        // Use -w with stdin to avoid leaking the secret in process arguments
-        execFileSync('security', ['add-generic-password', '-a', account, '-s', SERVICE, '-w'], {
-          input: secret,
-          stdio: ['pipe', 'pipe', 'pipe'],
-          timeout: TIMEOUT,
-        });
+        // Pass secret as -w argument (macOS security does not read from stdin)
+        execFileSync(
+          'security',
+          ['add-generic-password', '-a', account, '-s', SERVICE, '-w', secret],
+          {
+            stdio: ['pipe', 'pipe', 'pipe'],
+            timeout: TIMEOUT,
+          },
+        );
         return true;
 
       case 'linux':

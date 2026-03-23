@@ -6,7 +6,9 @@ FDX works with zero configuration in production. All defaults point to the produ
 
 | Variable | Scope | Default | Description |
 |----------|-------|---------|-------------|
-| `FDX_ENV` | Auth | `prod` | Environment preset (`prod` \| `test`) — switches Entra auth config |
+| `FDX_AUTHORITY` | Auth | production default | Entra authority URL |
+| `FDX_CLIENT_ID` | Auth | production default | Entra client (application) ID |
+| `FDX_SCOPES` | Auth | production default | Entra scopes |
 | `FDX_WALLET_MCP_URL` | Wallet only | `https://mcp.fd.xyz` | Wallet MCP service URL |
 | `FDX_PRISM_MCP_URL` | Prism only | `https://prism-mcp.fd.xyz` | Prism MCP service URL |
 | `FDX_STORE_PATH` | Auth | `~/.fdx/auth.json` | Token store file path |
@@ -26,8 +28,8 @@ For each service, the URL is resolved in this order:
 **Production (no config needed):**
 
 ```bash
-fdx wallet call getMyInfo        # → https://mcp.fd.xyz
-fdx prism call listPayments      # → https://prism-mcp.fd.xyz
+fdx wallet getMyInfo             # → https://mcp.fd.xyz
+fdx prism listPayments           # → https://prism-mcp.fd.xyz
 ```
 
 **Staging:**
@@ -36,8 +38,8 @@ fdx prism call listPayments      # → https://prism-mcp.fd.xyz
 export FDX_WALLET_MCP_URL=https://mcp-staging.fd.xyz
 export FDX_PRISM_MCP_URL=https://prism-mcp-staging.fd.xyz
 
-fdx wallet call getMyInfo        # → https://mcp-staging.fd.xyz
-fdx prism call listPayments      # → https://prism-mcp-staging.fd.xyz
+fdx wallet getMyInfo             # → https://mcp-staging.fd.xyz
+fdx prism listPayments           # → https://prism-mcp-staging.fd.xyz
 ```
 
 **Override one service only:**
@@ -45,14 +47,14 @@ fdx prism call listPayments      # → https://prism-mcp-staging.fd.xyz
 ```bash
 export FDX_WALLET_MCP_URL=http://localhost:3000
 
-fdx wallet call getMyInfo        # → http://localhost:3000
-fdx prism call listPayments      # → https://prism-mcp.fd.xyz (production default)
+fdx wallet getMyInfo             # → http://localhost:3000
+fdx prism listPayments           # → https://prism-mcp.fd.xyz (production default)
 ```
 
 **Inline (single command):**
 
 ```bash
-FDX_WALLET_MCP_URL=http://localhost:3000 fdx wallet call getMyInfo
+FDX_WALLET_MCP_URL=http://localhost:3000 fdx wallet getMyInfo
 ```
 
 **Persistent (add to shell profile):**
@@ -91,18 +93,19 @@ FDX_WALLET_MCP_URL=http://mcp-staging.fd.xyz
 
 ## Auth Configuration
 
-Entra authentication settings are controlled by the `FDX_ENV` environment variable:
+Entra authentication uses production defaults out of the box. Override any value with environment variables:
 
-| FDX_ENV | Authority | Client ID | Scopes |
-|---------|-----------|-----------|--------|
-| `prod` (default) | `https://auth.fd.xyz/financedistrict.onmicrosoft.com` | `77109def-...` | `api://fd-agent-wallet-mcp/mcp:tools openid offline_access` |
-| `test` | `https://auth.test.1stdigital.tech/401c099d-...` | `954aab11-...` | `api://fd-agent-wallet-mcp/mcp:tools openid offline_access` |
+| Variable | Description |
+|----------|-------------|
+| `FDX_AUTHORITY` | Entra authority URL |
+| `FDX_CLIENT_ID` | Entra client (application) ID |
+| `FDX_SCOPES` | Entra scopes |
 
 ```bash
-# Test environment
-export FDX_ENV=test
+# Point at a custom Entra tenant
+export FDX_AUTHORITY=https://login.example.com/my-tenant
+export FDX_CLIENT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 export FDX_WALLET_MCP_URL=https://mcp-test.fd.xyz
-export FDX_PRISM_MCP_URL=https://prism-mcp-test.fd.xyz
 ```
 
-Note: `FDX_ENV` only switches Entra auth config. MCP service URLs must be set separately via `FDX_WALLET_MCP_URL` / `FDX_PRISM_MCP_URL`.
+If no overrides are set, the built-in production config is used.

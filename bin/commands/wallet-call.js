@@ -51,7 +51,10 @@ async function showToolHelp(serviceName, method) {
 
     if (!tool) {
       spinner.error({ text: `Unknown tool: ${method}` });
-      const match = findClosestTool(method, tools.map((t) => t.name));
+      const match = findClosestTool(
+        method,
+        tools.map((t) => t.name),
+      );
       if (match) console.log(pc.yellow(`Did you mean ${pc.cyan(match)}?`));
       process.exit(1);
     }
@@ -148,7 +151,10 @@ module.exports = async function walletCall(argv, { serviceName = 'wallet' } = {}
 
     if (!tool) {
       spinner.error({ text: `Unknown method: ${method}` });
-      const suggestion = findClosestTool(method, tools.map((t) => t.name));
+      const suggestion = findClosestTool(
+        method,
+        tools.map((t) => t.name),
+      );
       if (suggestion) {
         console.log(pc.yellow(`Did you mean ${pc.cyan(suggestion)}?`));
       }

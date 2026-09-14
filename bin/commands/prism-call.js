@@ -2,8 +2,8 @@ const pc = require('picocolors');
 
 const { createClientFromEnv } = require('../../src');
 const { parseArgs } = require('../../src/utils/args');
-
 const createSpinner = require('../helpers/spinner');
+const { coerceArgsBySchema } = require('../helpers/wallet-method-registry');
 
 async function showToolsList() {
   const client = createClientFromEnv('prism');
@@ -114,7 +114,21 @@ module.exports = async function prismCall(argv) {
   let exitCode = 0;
 
   try {
-    const result = await client.callMcpTool(method, args);
+    const tools = await client.listTools();
+    const tool = tools.find((t) => t.name === method);
+
+    let coercedArgs;
+    try {
+      coercedArgs = coerceArgsBySchema(args, tool?.inputSchema);
+    } catch (coercionError) {
+      spinner.error({ text: `${method} failed` });
+      console.error(pc.red(coercionError.message));
+      console.error(pc.dim(`  Run fdx prism ${method} --help for usage details.`));
+      exitCode = 1;
+      return;
+    }
+
+    const result = await client.callMcpTool(method, coercedArgs);
 
     if (result.error) {
       spinner.error({ text: `${method} failed` });

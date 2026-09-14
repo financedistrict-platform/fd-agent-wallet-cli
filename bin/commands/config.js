@@ -35,7 +35,9 @@ module.exports = function config() {
     console.log(`  ${name.padEnd(17)}${url}  ${isOverride(envKey)}`);
   }
   if (process.env.FDX_MCP_SERVER) {
-    console.log(`  ${pc.yellow('FDX_MCP_SERVER')}     ${process.env.FDX_MCP_SERVER}  ${pc.yellow('(deprecated)')}`);
+    console.log(
+      `  ${pc.yellow('FDX_MCP_SERVER')}     ${process.env.FDX_MCP_SERVER}  ${pc.yellow('(deprecated)')}`,
+    );
   }
   console.log('');
 

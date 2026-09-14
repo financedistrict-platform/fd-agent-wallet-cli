@@ -1,7 +1,7 @@
 const assert = require('node:assert');
-const { describe, it } = require('node:test');
 const { execFileSync } = require('node:child_process');
 const path = require('node:path');
+const { describe, it } = require('node:test');
 
 const fdx = path.join(__dirname, '../../bin/fdx.js');
 const pkg = require('../../package.json');

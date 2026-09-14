@@ -5,8 +5,8 @@ const {
 
 const pkg = require('../package.json');
 
-const logger = require('./utils/logger');
 const { readStore, writeStore } = require('./storage');
+const logger = require('./utils/logger');
 
 const CLIENT_NAME = 'fdx';
 const CLIENT_VERSION = pkg.version;

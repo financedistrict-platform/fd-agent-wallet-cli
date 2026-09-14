@@ -2,7 +2,6 @@ const pc = require('picocolors');
 
 const { createClientFromEnv } = require('../../src');
 const { parseArgs } = require('../../src/utils/args');
-
 const createSpinner = require('../helpers/spinner');
 
 async function showToolsList() {

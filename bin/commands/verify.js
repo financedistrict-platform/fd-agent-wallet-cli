@@ -1,9 +1,8 @@
 const pc = require('picocolors');
 
 const { createClientFromEnv } = require('../../src');
-
-const createSpinner = require('../helpers/spinner');
 const { printError } = require('../helpers/cli-error-handler');
+const createSpinner = require('../helpers/spinner');
 
 module.exports = async function verify({ code }) {
   if (!code) {

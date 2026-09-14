@@ -2,9 +2,8 @@ const pc = require('picocolors');
 
 const { createClientFromEnv } = require('../../src');
 const { getServiceUrl, getServiceNames } = require('../../src/mcp-registry');
-
-const createSpinner = require('../helpers/spinner');
 const { printError } = require('../helpers/cli-error-handler');
+const createSpinner = require('../helpers/spinner');
 
 module.exports = async function register({ email }) {
   if (!email) {
@@ -18,7 +17,9 @@ module.exports = async function register({ email }) {
   console.log('');
   console.log(`${pc.dim('Email:')}${' '.repeat(Math.max(1, 12 - 'Email'.length - 1))}${email}`);
   for (const name of getServiceNames()) {
-    console.log(`${pc.dim(`${name}:`)}${' '.repeat(Math.max(1, 12 - name.length - 1))}${getServiceUrl(name)}`);
+    console.log(
+      `${pc.dim(`${name}:`)}${' '.repeat(Math.max(1, 12 - name.length - 1))}${getServiceUrl(name)}`,
+    );
   }
   console.log('');
 

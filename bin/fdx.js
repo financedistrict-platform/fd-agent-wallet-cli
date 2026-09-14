@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 
-require('dotenv').config({ path: require('path').resolve(process.cwd(), '.env'), quiet: true });
+const path = require('node:path');
 
 const { Command } = require('commander');
+const dotenv = require('dotenv');
 const pc = require('picocolors');
 
 const pkg = require('../package.json');
+const { SERVICES } = require('../src/mcp-registry');
+
+dotenv.config({ path: path.resolve(process.cwd(), '.env'), quiet: true });
 
 const program = new Command();
 
@@ -111,8 +115,6 @@ program
     }
     await require('./commands/prism-call')([method, ...rawArgs].filter(Boolean));
   });
-
-const { SERVICES } = require('../src/mcp-registry');
 
 program
   .command('services')

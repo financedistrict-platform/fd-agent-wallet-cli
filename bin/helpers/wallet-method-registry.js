@@ -16,19 +16,72 @@ function levenshtein(a, b) {
   return dp[m][n];
 }
 
-// Coerce CLI string args to number/integer based on MCP inputSchema
+const STRUCTURED_EXAMPLES = {
+  array: '["a","b"]',
+  object: '{"key":"value"}',
+};
+
+function matchesStructuredType(value, type) {
+  if (type === 'array') return Array.isArray(value);
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function describeParsedType(value) {
+  if (Array.isArray(value)) return 'array';
+  if (value === null) return 'null';
+  return typeof value;
+}
+
+function parseStructuredValue(key, type, raw) {
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(
+      `--${key} expects a JSON ${type}, but the value is not valid JSON: ${raw}\n` +
+        `  Example: --${key} '${STRUCTURED_EXAMPLES[type]}'`,
+    );
+  }
+
+  if (!matchesStructuredType(parsed, type)) {
+    throw new Error(
+      `--${key} expects a JSON ${type}, but got ${describeParsedType(parsed)}: ${raw}\n` +
+        `  Example: --${key} '${STRUCTURED_EXAMPLES[type]}'`,
+    );
+  }
+
+  return parsed;
+}
+
+// JSON Schema allows a union such as ["object", "null"] for a nullable param.
+// Only an unambiguous single non-null type is coerced; anything else stays a string.
+function resolveSchemaType(prop) {
+  const declared = Array.isArray(prop.type) ? prop.type : [prop.type];
+  const concrete = declared.filter((t) => t && t !== 'null');
+  return concrete.length === 1 ? concrete[0] : null;
+}
+
+// Coerce CLI string args to the types declared in the MCP inputSchema.
+// Values without a schema entry, and values the schema declares as string, are never touched.
 function coerceArgsBySchema(args, inputSchema) {
   if (!inputSchema?.properties) return args;
 
   const coerced = { ...args };
   for (const [key, value] of Object.entries(coerced)) {
     const prop = inputSchema.properties[key];
-    if (!prop) continue;
+    if (!prop || typeof value !== 'string') continue;
 
-    if ((prop.type === 'number' || prop.type === 'integer') && typeof value === 'string') {
+    const type = resolveSchemaType(prop);
+
+    if (type === 'array' || type === 'object') {
+      coerced[key] = parseStructuredValue(key, type, value);
+      continue;
+    }
+
+    if (type === 'number' || type === 'integer') {
       const num = Number(value);
       if (!Number.isNaN(num)) {
-        coerced[key] = prop.type === 'integer' ? Math.trunc(num) : num;
+        coerced[key] = type === 'integer' ? Math.trunc(num) : num;
       }
     }
   }

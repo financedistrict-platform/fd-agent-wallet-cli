@@ -130,6 +130,69 @@ describe('prism-call', () => {
     assert.ok(output.includes('"payments"'), 'should print JSON result');
   });
 
+  it('coerces args to the types declared in the tool inputSchema', async () => {
+    const calls = mockClient({
+      tools: [
+        {
+          name: 'createProjectFromWizard',
+          inputSchema: {
+            properties: {
+              projectName: { type: 'string' },
+              networkIds: { type: 'array' },
+              addresses: { type: 'object' },
+              fxBufferBasisPoints: { type: 'integer' },
+            },
+          },
+        },
+      ],
+    });
+    const prismCall = require('../bin/commands/prism-call');
+
+    await prismCall([
+      'createProjectFromWizard',
+      '--projectName',
+      'Acme',
+      '--networkIds',
+      '["eth","base"]',
+      '--addresses',
+      '{"eth":"0x00abc"}',
+      '--fxBufferBasisPoints',
+      '50',
+    ]);
+
+    const invocation = calls.find((c) => c.callTool === 'createProjectFromWizard');
+    assert.deepStrictEqual(invocation.args, {
+      projectName: 'Acme',
+      networkIds: ['eth', 'base'],
+      addresses: { eth: '0x00abc' },
+      fxBufferBasisPoints: 50,
+    });
+  });
+
+  it('exits 1 with a named error when a structured arg is not valid JSON', async () => {
+    const calls = mockClient({
+      tools: [
+        {
+          name: 'updateSettlementNetworks',
+          inputSchema: { properties: { networks: { type: 'array' } } },
+        },
+      ],
+    });
+    const prismCall = require('../bin/commands/prism-call');
+
+    try {
+      await prismCall(['updateSettlementNetworks', '--networks', 'not-json']);
+    } catch {
+      // process.exit throws
+    }
+
+    assert.strictEqual(exitCode, 1);
+    assert.ok(!calls.some((c) => c.callTool), 'should not reach the server');
+    const errors = consoleErrors.join('\n');
+    assert.ok(errors.includes('--networks'), 'should name the offending param');
+    assert.ok(errors.includes('JSON array'), 'should state the expected type');
+  });
+
   it('exits 1 when tool returns error', async () => {
     mockClient({
       tools: [],

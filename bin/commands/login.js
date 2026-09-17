@@ -8,7 +8,8 @@ const createSpinner = require('../helpers/spinner');
 module.exports = async function login({ email }) {
   if (!email) {
     console.error(pc.red('--email is required'));
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   const client = createClientFromEnv();
@@ -31,7 +32,8 @@ module.exports = async function login({ email }) {
   } catch (err) {
     spinner.error({ text: 'Login failed' });
     printError(err);
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   spinner.success({ text: 'Verification code sent' });

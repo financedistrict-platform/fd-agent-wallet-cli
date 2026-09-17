@@ -29,7 +29,7 @@ async function showToolsList() {
     if (error.message.includes('access token') || error.message.includes('login')) {
       console.error(pc.dim('Run fdx login --email <email> to authenticate first.'));
     }
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
     await client.close().catch(() => {});
   }
@@ -47,7 +47,8 @@ async function showToolHelp(method) {
       spinner.error({ text: `Unknown tool: ${method}` });
       const match = tools.find((t) => t.name.toLowerCase().includes(method.toLowerCase()));
       if (match) console.log(pc.yellow(`Did you mean ${pc.cyan(match.name)}?`));
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
 
     spinner.success({ text: method });
@@ -89,7 +90,7 @@ async function showToolHelp(method) {
   } catch (error) {
     spinner.error({ text: 'Failed to fetch schema' });
     console.error(pc.red(error.message));
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
     await client.close().catch(() => {});
   }
@@ -145,6 +146,6 @@ module.exports = async function prismCall(argv) {
     exitCode = 1;
   } finally {
     await client.close().catch(() => {});
-    if (exitCode) process.exit(exitCode);
+    if (exitCode) process.exitCode = exitCode;
   }
 };

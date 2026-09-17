@@ -14,7 +14,8 @@ module.exports = async function status() {
     console.log(pc.red('Status: not configured'));
     console.log(`  ${pc.dim('MCP service:')}  ${mcpService}`);
     console.log(`  ${pc.dim('Store path:')} ${storePath} (${error.message})`);
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   if (!state.authenticated) {
@@ -22,7 +23,8 @@ module.exports = async function status() {
     console.log(`  ${pc.dim('MCP service:')}  ${mcpService}`);
     console.log(`  ${pc.dim('Store path:')} ${storePath}`);
     console.log(`  Run ${pc.cyan('"fdx register"')} or ${pc.cyan('"fdx login"')} to authenticate.`);
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   const statusLabel = state.expired ? pc.yellow('token expired') : pc.green('authenticated');
@@ -46,7 +48,8 @@ module.exports = async function status() {
       pc.red('Token expired and no refresh token.') +
         ` Run ${pc.cyan('"fdx login --email <email>"')} to re-authenticate.`,
     );
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   if (state.expired && state.hasRefresh) {

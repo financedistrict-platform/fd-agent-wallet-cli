@@ -20,8 +20,36 @@ FDX works with zero configuration in production. All defaults point to the produ
 For each service, the URL is resolved in this order:
 
 1. **Per-service env var** — `FDX_WALLET_MCP_URL` or `FDX_PRISM_MCP_URL`
-2. **Global fallback** — `FDX_MCP_SERVER` (deprecated — shows warning)
-3. **Hardcoded default** — production URL
+2. **Persisted config** — `~/.fdx/config.json` (see below)
+3. **Global fallback** — `FDX_MCP_SERVER` (deprecated — shows warning)
+4. **Hardcoded default** — production URL
+
+## Persistent Config File
+
+`fdx config` persists values to `~/.fdx/config.json` so you do not have to export
+env vars in every shell. Real env vars and `.env` always win over the file.
+
+```bash
+fdx config                                        # show resolved config + source of each value
+fdx config set prism_mcp_url https://prism-mcp-staging.fd.xyz
+fdx config get prism_mcp_url
+fdx config unset prism_mcp_url
+```
+
+Each config key maps to the matching env var:
+
+| Config key | Env var |
+|------------|---------|
+| `authority` | `FDX_AUTHORITY` |
+| `client_id` | `FDX_CLIENT_ID` |
+| `scopes` | `FDX_SCOPES` |
+| `wallet_mcp_url` | `FDX_WALLET_MCP_URL` |
+| `prism_mcp_url` | `FDX_PRISM_MCP_URL` |
+| `store_path` | `FDX_STORE_PATH` |
+| `log_path` | `FDX_LOG_PATH` |
+| `log_level` | `FDX_LOG_LEVEL` |
+
+`fdx config` labels every value with where it came from — `(env)`, `(config)`, or `(default)`.
 
 ## Examples by Environment
 

@@ -35,7 +35,7 @@ async function showToolsList(serviceName, hint) {
     if (error.message.includes('access token') || error.message.includes('login')) {
       console.error(pc.dim('Run fdx login --email <email> to authenticate first.'));
     }
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
     await client.close().catch(() => {});
   }
@@ -56,7 +56,8 @@ async function showToolHelp(serviceName, method) {
         tools.map((t) => t.name),
       );
       if (match) console.log(pc.yellow(`Did you mean ${pc.cyan(match)}?`));
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
 
     spinner.success({ text: method });
@@ -98,7 +99,7 @@ async function showToolHelp(serviceName, method) {
   } catch (error) {
     spinner.error({ text: 'Failed to fetch schema' });
     console.error(pc.red(error.message));
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
     await client.close().catch(() => {});
   }
@@ -159,17 +160,29 @@ module.exports = async function walletCall(argv, { serviceName = 'wallet' } = {}
         console.log(pc.yellow(`Did you mean ${pc.cyan(suggestion)}?`));
       }
       console.log(pc.dim('Run fdx wallet to see all available methods.'));
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
 
-    const coercedArgs = coerceArgsBySchema(args, tool.inputSchema);
+    let coercedArgs;
+    try {
+      coercedArgs = coerceArgsBySchema(args, tool?.inputSchema);
+    } catch (coercionError) {
+      spinner.error({ text: `${method} failed` });
+      console.error(pc.red(coercionError.message));
+      console.error(pc.dim(`  Run fdx wallet ${method} --help for usage details.`));
+      process.exitCode = 1;
+      return;
+    }
+
     const result = await client.callMcpTool(method, coercedArgs);
 
     if (result.error) {
       spinner.error({ text: `${method} failed` });
       console.error(JSON.stringify({ error: result.error }, null, 2));
       console.error(pc.dim(`  Run fdx wallet ${method} --help for usage details.`));
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
 
     spinner.success({ text: method });
@@ -177,7 +190,7 @@ module.exports = async function walletCall(argv, { serviceName = 'wallet' } = {}
   } catch (error) {
     spinner.error({ text: `${method} failed` });
     console.error(pc.red(error.message));
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
     await client.close().catch(() => {});
   }

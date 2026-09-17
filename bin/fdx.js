@@ -7,9 +7,11 @@ const dotenv = require('dotenv');
 const pc = require('picocolors');
 
 const pkg = require('../package.json');
+const { loadConfigIntoEnv } = require('../src/config');
 const { SERVICES } = require('../src/mcp-registry');
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env'), quiet: true });
+loadConfigIntoEnv();
 
 const program = new Command();
 
@@ -77,9 +79,59 @@ program
 
 program
   .command('config')
-  .description('Show resolved configuration (env vars, Entra preset, MCP URLs)')
-  .action(() => {
-    require('./commands/config')();
+  .description('Show or manage persistent configuration (~/.fdx/config.json)')
+  .argument('[action]', 'set | get | unset (omit to show all)')
+  .argument('[key]', 'config key (e.g. authority, wallet_mcp_url)')
+  .argument('[value]', 'value to set')
+  .addHelpText(
+    'after',
+    [
+      '',
+      `${pc.dim('Available keys:')}`,
+      `  authority, client_id, scopes, wallet_mcp_url, prism_mcp_url,`,
+      `  store_path, log_path, log_level`,
+      '',
+      `${pc.dim('Examples:')}`,
+      `  fdx config                                     Show resolved config`,
+      `  fdx config set authority https://auth.test...  Persist a value`,
+      `  fdx config get authority                       Read a persisted value`,
+      `  fdx config unset authority                     Remove a persisted value`,
+    ].join('\n'),
+  )
+  .action((action, key, value) => {
+    const configCmd = require('./commands/config');
+
+    if (!action) return configCmd.show();
+
+    if (action === 'set') {
+      if (!key || !value) {
+        console.error(pc.red('Usage: fdx config set <key> <value>'));
+        process.exitCode = 1;
+        return;
+      }
+      return configCmd.set(key, value);
+    }
+
+    if (action === 'get') {
+      if (!key) {
+        console.error(pc.red('Usage: fdx config get <key>'));
+        process.exitCode = 1;
+        return;
+      }
+      return configCmd.get(key);
+    }
+
+    if (action === 'unset') {
+      if (!key) {
+        console.error(pc.red('Usage: fdx config unset <key>'));
+        process.exitCode = 1;
+        return;
+      }
+      return configCmd.unset(key);
+    }
+
+    console.error(pc.red(`Unknown config action "${action}". Use set, get, or unset.`));
+    process.exitCode = 1;
   });
 
 program
@@ -144,10 +196,10 @@ program
     console.log(`  Use:  ${pc.cyan('fdx <service> <method>')}`);
     console.log('');
     console.log(pc.dim('Run fdx services to see available services.'));
-    process.exit(1);
+    process.exitCode = 1;
   });
 
 program.parseAsync().catch((error) => {
   console.error(pc.red(error.message));
-  process.exit(1);
+  process.exitCode = 1;
 });

@@ -7,7 +7,8 @@ const createSpinner = require('../helpers/spinner');
 module.exports = async function verify({ code }) {
   if (!code) {
     console.error(pc.red('--code is required'));
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   const client = createClientFromEnv();
@@ -17,7 +18,8 @@ module.exports = async function verify({ code }) {
     console.error(
       pc.red('No pending verification found. Run "fdx register" or "fdx login" first.'),
     );
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   const { continuationToken, email, flow } = pending;
@@ -40,7 +42,8 @@ module.exports = async function verify({ code }) {
   } catch (err) {
     spinner.error({ text: 'Verification failed' });
     printError(err);
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   spinner.success({ text: 'Authentication successful' });

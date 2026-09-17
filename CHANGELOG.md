@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-09-17
+
+### Fixed
+
+- **Structured tool args are sent with the right type.** Values for parameters the
+  MCP `inputSchema` declares as `array` or `object` are parsed as JSON before the
+  call, instead of reaching the server as a string. This unblocks
+  `updateSettlementNetworks`, `updateSettlementCurrencies`, `createProject`, and
+  `updateWalletSettings`, which previously failed with `TOOL_ERROR`. Values the
+  schema declares as `string` are still never coerced, so addresses, IDs, and
+  amounts keep their exact text. Invalid JSON is now rejected with a message
+  naming the parameter and the expected type, before any request is sent.
+- **Failing commands exit cleanly.** Commands set `process.exitCode` and let the
+  event loop drain rather than calling `process.exit()` while a connection is
+  still closing. On Windows this previously aborted the process with a libuv
+  assertion (`src\win\async.c`, exit code `0xC0000409`) instead of exiting 1.
+
+### Added
+
+- `~/.fdx/config.json` and the `fdx config set|get|unset` actions are part of the
+  repository and covered by tests. `fdx config` labels each resolved value with
+  its source — `(env)`, `(config)`, or `(default)`. Env vars and `.env` continue
+  to take precedence over the config file. The `(config)` label now actually
+  appears: persisted values are copied into the environment at startup, so the
+  label compares values instead of merely checking that an env var is set.
+- An unreadable `~/.fdx/config.json` no longer takes the whole CLI down. Startup
+  warns and continues, `fdx config` reports the path and the repair instead of a
+  parser stack trace, and `fdx config unset` still works so the file can be
+  cleared from the CLI itself. Persisted empty-string values are also read back
+  correctly rather than being reported as unset.
+- `fdx wallet` now reports an invalid JSON argument the way `fdx prism` does —
+  naming the parameter and the expected type, before any request is sent.
+
 ## [0.4.0] - 2026-03-16
 
 ### Added

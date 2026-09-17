@@ -3,10 +3,12 @@ const { describe, it, beforeEach, afterEach, mock } = require('node:test');
 
 describe('prism-call', () => {
   let originalCreateClientFromEnv;
+  let originalExitCode;
   let srcModule;
-  let exitCode;
   let consoleOutput;
   let consoleErrors;
+
+  const exitCode = () => process.exitCode ?? null;
 
   beforeEach(() => {
     // Capture console output
@@ -15,12 +17,8 @@ describe('prism-call', () => {
     mock.method(console, 'log', (...args) => consoleOutput.push(args.join(' ')));
     mock.method(console, 'error', (...args) => consoleErrors.push(args.join(' ')));
 
-    // Capture process.exit
-    exitCode = null;
-    mock.method(process, 'exit', (code) => {
-      exitCode = code;
-      throw new Error(`process.exit(${code})`);
-    });
+    originalExitCode = process.exitCode;
+    process.exitCode = undefined;
 
     // Mock createClientFromEnv
     srcModule = require('../src');
@@ -29,6 +27,7 @@ describe('prism-call', () => {
 
   afterEach(() => {
     srcModule.createClientFromEnv = originalCreateClientFromEnv;
+    process.exitCode = originalExitCode;
     mock.restoreAll();
     // Clear require cache for prism-call so mocks apply fresh
     delete require.cache[require.resolve('../bin/commands/prism-call')];
@@ -57,11 +56,8 @@ describe('prism-call', () => {
     const calls = mockClient({ tools: [] });
     const prismCall = require('../bin/commands/prism-call');
 
-    try {
-      await prismCall([]);
-    } catch {
-      // process.exit throws
-    }
+    await prismCall([]);
+
     assert.strictEqual(calls[0].serviceName, 'prism');
   });
 
@@ -109,12 +105,9 @@ describe('prism-call', () => {
     mockClient({ tools: [{ name: 'realTool', description: 'exists' }] });
     const prismCall = require('../bin/commands/prism-call');
 
-    try {
-      await prismCall(['nonexistent', '--help']);
-    } catch {
-      // process.exit throws
-    }
-    assert.strictEqual(exitCode, 1);
+    await prismCall(['nonexistent', '--help']);
+
+    assert.strictEqual(exitCode(), 1);
   });
 
   it('invokes tool and prints result', async () => {
@@ -180,13 +173,9 @@ describe('prism-call', () => {
     });
     const prismCall = require('../bin/commands/prism-call');
 
-    try {
-      await prismCall(['updateSettlementNetworks', '--networks', 'not-json']);
-    } catch {
-      // process.exit throws
-    }
+    await prismCall(['updateSettlementNetworks', '--networks', 'not-json']);
 
-    assert.strictEqual(exitCode, 1);
+    assert.strictEqual(exitCode(), 1);
     assert.ok(!calls.some((c) => c.callTool), 'should not reach the server');
     const errors = consoleErrors.join('\n');
     assert.ok(errors.includes('--networks'), 'should name the offending param');
@@ -200,11 +189,8 @@ describe('prism-call', () => {
     });
     const prismCall = require('../bin/commands/prism-call');
 
-    try {
-      await prismCall(['badTool']);
-    } catch {
-      // process.exit throws
-    }
-    assert.strictEqual(exitCode, 1);
+    await prismCall(['badTool']);
+
+    assert.strictEqual(exitCode(), 1);
   });
 });

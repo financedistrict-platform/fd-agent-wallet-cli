@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-10-05
+
+### Changed
+
+- **Smaller published package.** `package.json` now has a `files` whitelist
+  (`bin/`, `src/`, `README.md`, `LICENSE`), so `docs/` and tooling config such as
+  `.eslintrc.cjs` and `.prettierrc` are no longer shipped to npm. 0.5.0 also
+  included a stray `.claude/settings.local.json`, which this removes.
+- The `bin.fdx` path is normalized to `bin/fdx.js`, silencing npm's publish-time
+  auto-correction warning.
+- Releases are published from GitHub Actions through npm trusted publishing
+  (OIDC) rather than a stored npm token.
+
 ## [0.5.0] - 2026-09-17
 
 ### Fixed

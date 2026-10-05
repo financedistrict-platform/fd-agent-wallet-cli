@@ -1,10 +1,16 @@
 {
   "name": "@financedistrict/fdx",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Agent wallet CLI — a command-line interface to the Finance District MCP wallet server",
   "main": "src/index.js",
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
   "bin": {
-    "fdx": "./bin/fdx.js"
+    "fdx": "bin/fdx.js"
   },
   "scripts": {
     "test": "node --test test/*.test.js test/**/*.test.js",
